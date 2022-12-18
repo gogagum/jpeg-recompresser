@@ -71,18 +71,6 @@
 //                                   // your code here
 //                                   njDone();
 //                               }
-// NJ_USE_LIBC=1           = Use the malloc(), free(), memset() and memcpy()
-//                           functions from the standard C library (default).
-// NJ_USE_LIBC=0           = Don't use the standard C library. In this mode,
-//                           external functions njAlloc(), njFreeMem(),
-//                           njFillMem() and njCopyMem() need to be defined
-//                           and implemented somewhere.
-// NJ_USE_WIN32=0          = Normal mode (default).
-// NJ_USE_WIN32=1          = If compiling with MSVC for Win32 and
-//                           NJ_USE_LIBC=0, NanoJPEG will use its own
-//                           implementations of the required C library
-//                           functions (default if compiling with MSVC and
-//                           NJ_USE_LIBC=0).
 // NJ_CHROMA_FILTER=1      = Use the bicubic chroma upsampling filter
 //                           (default).
 // NJ_CHROMA_FILTER=0      = Use simple pixel repetition for chroma upsampling
@@ -113,27 +101,12 @@
 // copy and pase this into nanojpeg.h if you want                            //
 ///////////////////////////////////////////////////////////////////////////////
 
-
-#define _CRT_SECURE_NO_WARNINGS
-
 #include "nanojpeg.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
 // CONFIGURATION SECTION                                                     //
 // adjust the default settings for the NJ_ defines here                      //
 ///////////////////////////////////////////////////////////////////////////////
-
-#ifndef NJ_USE_LIBC
-    #define NJ_USE_LIBC 1
-#endif
-
-#ifndef NJ_USE_WIN32
-  #ifdef _MSC_VER
-    #define NJ_USE_WIN32 (!NJ_USE_LIBC)
-  #else
-    #define NJ_USE_WIN32 0
-  #endif
-#endif
 
 #ifndef NJ_CHROMA_FILTER
     #define NJ_CHROMA_FILTER 1
@@ -142,7 +115,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // EXAMPLE PROGRAM                                                           //
-// just define _NJ_EXAMPLE_PROGRAM to compile this (requires NJ_USE_LIBC)    //
+// just define _NJ_EXAMPLE_PROGRAM to compile this                           //
 ///////////////////////////////////////////////////////////////////////////////
 
 #define _NJ_EXAMPLE_PROGRAM
@@ -179,7 +152,6 @@ int main(int argc, char* argv[])
     size = (int) fread(buf, 1, size, f);
     fclose(f);
 
-    njInit();
     if (njDecode(fp, buf, size)) {
         free((void*)buf);
         printf("Error decoding the input file.\n");
@@ -195,7 +167,6 @@ int main(int argc, char* argv[])
 
     free((void*)buf);
 
-    njDone();
     return 0;
 }
 
@@ -215,41 +186,14 @@ int main(int argc, char* argv[])
     #define NJ_FORCE_INLINE static inline
 #endif
 
-#if NJ_USE_LIBC
-    #include <stdlib.h>
-    #include <string.h>
-    #include <iostream>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
 
-#define njAllocMem malloc
-    #define njFreeMem  free
-    #define njFillMem  memset
-    #define njCopyMem  memcpy
-#elif NJ_USE_WIN32
-    #include <windows.h>
-    #define njAllocMem(size) ((void*) LocalAlloc(LMEM_FIXED, (SIZE_T)(size)))
-    #define njFreeMem(block) ((void) LocalFree((HLOCAL) block))
-    static inline void njFillMem(void* block, unsigned char value, int count) { __asm {
-        mov edi, block
-        mov al, value
-        mov ecx, count
-        rep stosb
-    } }
-    static inline void njCopyMem(void* dest, const void* src, int count) { __asm {
-        mov edi, dest
-        mov esi, src
-        mov ecx, count
-        rep movsb
-    } }
-#else
-    extern void* njAllocMem(int size);
-    extern void njFreeMem(void* block);
-    extern void njFillMem(void* block, unsigned char byte, int size);
-    extern void njCopyMem(void* dest, const void* src, int size);
-#endif
-
-typedef struct _nj_code {
-    unsigned char bits, code;
-} nj_vlc_code_t;
+struct nj_vlc_code_t {
+    unsigned char bits = 0;
+    unsigned char code = 0;
+};
 
 struct nj_component_t {
     int cid;
@@ -262,26 +206,30 @@ struct nj_component_t {
     std::vector<unsigned char> pixels;
 };
 
-typedef struct _nj_ctx {
-    nj_result_t error;
-    const unsigned char *pos;
-    int size;
-    int length;
-    int width, height;
-    int mbwidth, mbheight;
-    int mbsizex, mbsizey;
-    int ncomp;
-    std::array<nj_component_t, 3> comp;
-    int qtused, qtavail;
-    unsigned char qtab[4][64];
-    nj_vlc_code_t vlctab[4][65536];
-    int buf, bufbits;
-    std::array<int, 64> block;
-    int rstinterval;
+struct nj_context_t {
+    nj_result_t error = NJ_OK;
+    const unsigned char* pos = nullptr;
+    int size = 0;
+    int length = 0;
+    int width, height = 0;
+    int mbwidth = 0;
+    int mbheight = 0;
+    int mbsizex = 0;
+    int mbsizey = 0;
+    int ncomp = 0;
+    std::array<nj_component_t, 3> comp{};
+    int qtused = 0;
+    int qtavail = 0;
+    std::array<std::array<unsigned char, 64>, 4> qtab{};
+    std::array<std::array<nj_vlc_code_t, 65536>, 4> vlctab{};
+    int buf = 0;
+    int bufbits = 0;
+    std::array<int, 64> block{};
+    int rstinterval = 0;
     std::vector<unsigned char> rgb;
-} nj_context_t;
+};
 
-static nj_context_t nj;
+nj_context_t nj;
 
 static const auto njZZ =
         std::array<char, 64>{ 0,  1,  8,  16, 9,  2,  3,  10,
@@ -443,7 +391,7 @@ static int njShowBits(int bits) {
 
 static inline void njSkipBits(int bits) {
     if (nj.bufbits < bits)
-        (void) njShowBits(bits);
+        njShowBits(bits);
     nj.bufbits -= bits;
 }
 
@@ -617,8 +565,9 @@ static int njGetVLC(nj_vlc_code_t* vlc, unsigned char* code) {
     bits = value & 15;
     if (!bits) return 0;
     value = njGetBits(bits);
-    if (value < (1 << (bits - 1)))
+    if (value < (1 << (bits - 1))) {
         value += ((-1) << bits) + 1;
+    }
     return value;
 }
 
@@ -626,7 +575,7 @@ static inline void njDecodeBlock(FILE* fp, nj_component_t* c, unsigned char* out
 {
     unsigned char code = 0;
     int value, coef = 0;
-    njFillMem(nj.block.data(), 0, sizeof(nj.block));
+    std::fill(nj.block.begin(), nj.block.end(), 0);  // TODO
     c->dcpred += njGetVLC(&nj.vlctab[c->dctabsel][0], NULL);
 
     nj.block[0] = (c->dcpred) * 1; //nj.qtab[c->qtsel][0]
@@ -851,7 +800,7 @@ static inline void njConvert(void) {
         unsigned char *pout = &nj.comp[0].pixels[nj.comp[0].width];
         int y;
         for (y = nj.comp[0].height - 1;  y;  --y) {
-            njCopyMem(pout, pin, nj.comp[0].width);
+            std::memcpy(pout, pin, nj.comp[0].width);
             pin += nj.comp[0].stride;
             pout += nj.comp[0].width;
         }
@@ -859,16 +808,7 @@ static inline void njConvert(void) {
     }
 }
 
-void njInit(void) {
-    njFillMem(&nj, 0, sizeof(nj_context_t));
-}
-
-void njDone(void) {
-    njInit();
-}
-
 nj_result_t njDecode(FILE* fp, const void* jpeg, const int size) {
-    njDone();
     nj.pos = (const unsigned char*) jpeg;
     nj.size = size & 0x7FFFFFFF;
     if (nj.size < 2) {

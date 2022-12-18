@@ -116,68 +116,7 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
-#ifndef _NANOJPEG_H
-#define _NANOJPEG_H
-
-// nj_result_t: Result codes for njDecode().
-typedef enum _nj_result {
-    NJ_OK = 0,        // no error, decoding successful
-    NJ_NO_JPEG,       // not a JPEG file
-    NJ_UNSUPPORTED,   // unsupported format
-    NJ_OUT_OF_MEM,    // out of memory
-    NJ_INTERNAL_ERR,  // internal error
-    NJ_SYNTAX_ERROR,  // syntax error
-    __NJ_FINISHED,    // used internally, will never be reported
-} nj_result_t;
-
-// njInit: Initialize NanoJPEG.
-// For safety reasons, this should be called at least one time before using
-// using any of the other NanoJPEG functions.
-void njInit(void);
-
-// njDecode: Decode a JPEG image.
-// Decodes a memory dump of a JPEG file into internal buffers.
-// Parameters:
-//   jpeg = The pointer to the memory dump.
-//   size = The size of the JPEG file.
-// Return value: The error code in case of failure, or NJ_OK (zero) on success.
-nj_result_t njDecode(const void* jpeg, const int size);
-
-// njGetWidth: Return the width (in pixels) of the most recently decoded
-// image. If njDecode() failed, the result of njGetWidth() is undefined.
-int njGetWidth(void);
-
-// njGetHeight: Return the height (in pixels) of the most recently decoded
-// image. If njDecode() failed, the result of njGetHeight() is undefined.
-int njGetHeight(void);
-
-// njIsColor: Return 1 if the most recently decoded image is a color image
-// (RGB) or 0 if it is a grayscale image. If njDecode() failed, the result
-// of njGetWidth() is undefined.
-int njIsColor(void);
-
-// njGetImage: Returns the decoded image data.
-// Returns a pointer to the most recently image. The memory layout it byte-
-// oriented, top-down, without any padding between lines. Pixels of color
-// images will be stored as three consecutive bytes for the red, green and
-// blue channels. This data format is thus compatible with the PGM or PPM
-// file formats and the OpenGL texture formats GL_LUMINANCE8 or GL_RGB8.
-// If njDecode() failed, the result of njGetImage() is undefined.
-unsigned char* njGetImage(void);
-
-// njGetImageSize: Returns the size (in bytes) of the image data returned
-// by njGetImage(). If njDecode() failed, the result of njGetImageSize() is
-// undefined.
-int njGetImageSize(void);
-
-// njDone: Uninitialize NanoJPEG.
-// Resets NanoJPEG's internal state and frees all memory that has been
-// allocated at run-time by NanoJPEG. It is still possible to decode another
-// image after a njDone() call.
-void njDone(void);
-
-#endif//_NANOJPEG_H
-
+#include "nanojpeg.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
 // CONFIGURATION SECTION                                                     //
@@ -210,20 +149,19 @@ void njDone(void);
 
 #ifdef  _NJ_EXAMPLE_PROGRAM
 #include <filesystem>
-#include <iostream>
 #include <string>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-FILE *fp;
+//FILE *fp;
 int main(int argc, char* argv[])
 {
 
     int size;
     char *buf;
     FILE *f;
-    fp = fopen(argv[2], "w+");
+    FILE* fp = fopen(argv[2], "w+");
     if (argc < 4) {
         printf("Usage: %s <input.jpg> dct_dump.txt dim.txt quality_of_the_image\n", argv[0]);
         return 2;
@@ -241,7 +179,7 @@ int main(int argc, char* argv[])
     fclose(f);
 
     njInit();
-    if (njDecode(buf, size)) {
+    if (njDecode(fp, buf, size)) {
         free((void*)buf);
         printf("Error decoding the input file.\n");
         return 1;
@@ -579,6 +517,9 @@ static inline void njDecodeSOF(void) {
     }
     nj.mbsizex = ssxmax << 3;
     nj.mbsizey = ssymax << 3;
+    if (nj.mbsizex == 0 || nj.mbsizey == 0) {
+        njThrow(NJ_INTERNAL_ERR);
+    }
     nj.mbwidth = (nj.width + nj.mbsizex - 1) / nj.mbsizex;
     nj.mbheight = (nj.height + nj.mbsizey - 1) / nj.mbsizey;
     for (i = 0, c = nj.comp.data();  i < nj.ncomp;  ++i, ++c) {
@@ -683,7 +624,7 @@ static int njGetVLC(nj_vlc_code_t* vlc, unsigned char* code) {
     return value;
 }
 
-static inline void njDecodeBlock(nj_component_t* c, unsigned char* out)
+static inline void njDecodeBlock(FILE* fp, nj_component_t* c, unsigned char* out)
 {
     unsigned char code = 0;
     int value, coef = 0;
@@ -710,7 +651,7 @@ static inline void njDecodeBlock(nj_component_t* c, unsigned char* out)
     for(i = 0; i < 64; i++) {
 
         fprintf(fp, "%d ", nj.block[i]);
-         printf("%d ", nj.block[i]);
+        printf("%d ", nj.block[i]);
 
         //cout << nj.block[i];
     }
@@ -736,7 +677,7 @@ static inline void njDecodeBlock(nj_component_t* c, unsigned char* out)
     }
 }
 
-static inline void njDecodeScan(void) {
+static inline void njDecodeScan(FILE* fp) {
     int i, mbx, mby, sbx, sby;
     int rstcount = nj.rstinterval, nextrst = 0;
     nj_component_t* c;
@@ -758,7 +699,7 @@ static inline void njDecodeScan(void) {
         for (i = 0, c = nj.comp.data();  i < nj.ncomp;  ++i, ++c)
             for (sby = 0;  sby < c->ssy;  ++sby)
                 for (sbx = 0;  sbx < c->ssx;  ++sbx) {
-                    njDecodeBlock(c, &c->pixels[((mby * c->ssy + sby) * c->stride + mbx * c->ssx + sbx) << 3]);
+                    njDecodeBlock(fp, c, &c->pixels[((mby * c->ssy + sby) * c->stride + mbx * c->ssx + sbx) << 3]);
                     njCheckError();
                 }
         if (++mbx >= nj.mbwidth) {
@@ -940,7 +881,7 @@ void njDone(void) {
     njInit();
 }
 
-nj_result_t njDecode(const void* jpeg, const int size) {
+nj_result_t njDecode(FILE* fp, const void* jpeg, const int size) {
     njDone();
     nj.pos = (const unsigned char*) jpeg;
     nj.size = size & 0x7FFFFFFF;
@@ -959,7 +900,7 @@ nj_result_t njDecode(const void* jpeg, const int size) {
             case 0xC4: njDecodeDHT();  break;
             case 0xDB: njDecodeDQT();  break;
             case 0xDD: njDecodeDRI();  break;
-            case 0xDA: njDecodeScan(); break;
+            case 0xDA: njDecodeScan(fp); break;
             case 0xFE: njSkipMarker(); break;
             default:
                 if ((nj.pos[-1] & 0xF0) == 0xE0)

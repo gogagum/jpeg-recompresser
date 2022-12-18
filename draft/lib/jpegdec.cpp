@@ -150,11 +150,12 @@
 #ifdef  _NJ_EXAMPLE_PROGRAM
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//FILE *fp;
+
 int main(int argc, char* argv[])
 {
 
@@ -258,7 +259,7 @@ struct nj_component_t {
     int qtsel;
     int actabsel, dctabsel;
     int dcpred;
-    unsigned char *pixels;
+    std::vector<unsigned char> pixels;
 };
 
 typedef struct _nj_ctx {
@@ -277,7 +278,7 @@ typedef struct _nj_ctx {
     int buf, bufbits;
     std::array<int, 64> block;
     int rstinterval;
-    unsigned char *rgb;
+    std::vector<unsigned char> rgb;
 } nj_context_t;
 
 static nj_context_t nj;
@@ -529,13 +530,10 @@ static inline void njDecodeSOF(void) {
         if (((c->width < 3) && (c->ssx != ssxmax)) || ((c->height < 3) && (c->ssy != ssymax))) {
             njThrow(NJ_UNSUPPORTED);
         }
-        if (!(c->pixels = (unsigned char*)njAllocMem(c->stride * nj.mbheight * c->ssy << 3))) {
-            njThrow(NJ_OUT_OF_MEM);
-        }
+        c->pixels = std::vector<unsigned char>(c->stride * nj.mbheight * c->ssy << 3);
     }
     if (nj.ncomp == 3) {
-        nj.rgb = (unsigned char*) njAllocMem(nj.width * nj.height * nj.ncomp);
-        if (!nj.rgb) njThrow(NJ_OUT_OF_MEM);
+        nj.rgb = std::vector<unsigned char>(nj.width * nj.height * nj.ncomp);
     }
     njSkip(nj.length);
 }
@@ -737,12 +735,11 @@ static inline void njDecodeScan(FILE* fp) {
 
 static inline void njUpsampleH(nj_component_t* c) {
     const int xmax = c->width - 3;
-    unsigned char *out, *lin, *lout;
+    unsigned char *lin, *lout;
     int x, y;
-    out = (unsigned char*) njAllocMem((c->width * c->height) << 1);
-    if (!out) njThrow(NJ_OUT_OF_MEM);
-    lin = c->pixels;
-    lout = out;
+    auto out = std::vector<unsigned char>((c->width * c->height) << 1);
+    lin = c->pixels.data();
+    lout = out.data();
     for (y = c->height;  y;  --y) {
         lout[0] = CF(CF2A * lin[0] + CF2B * lin[1]);
         lout[1] = CF(CF3X * lin[0] + CF3Y * lin[1] + CF3Z * lin[2]);
@@ -759,16 +756,14 @@ static inline void njUpsampleH(nj_component_t* c) {
     }
     c->width <<= 1;
     c->stride = c->width;
-    njFreeMem((void*)c->pixels);
     c->pixels = out;
 }
 
 static inline void njUpsampleV(nj_component_t* c) {
     const int w = c->width, s1 = c->stride, s2 = s1 + s1;
-    unsigned char *out, *cin, *cout;
+    unsigned char *cin, *cout;
     int x, y;
-    out = (unsigned char*) njAllocMem((c->width * c->height) << 1);
-    if (!out) njThrow(NJ_OUT_OF_MEM);
+    auto out = std::vector<unsigned char>((c->width * c->height) << 1);
     for (x = 0;  x < w;  ++x) {
         cin = &c->pixels[x];
         cout = &out[x];
@@ -788,7 +783,6 @@ static inline void njUpsampleV(nj_component_t* c) {
     }
     c->height <<= 1;
     c->stride = c->width;
-    njFreeMem((void*) c->pixels);
     c->pixels = out;
 }
 
@@ -796,12 +790,11 @@ static inline void njUpsampleV(nj_component_t* c) {
 
 static inline void njUpsample(nj_component_t* c) {
     int x, y, xshift = 0, yshift = 0;
-    unsigned char *out, *lin, *lout;
+    unsigned char *lin, *lout;
     while (c->width < nj.width) { c->width <<= 1; ++xshift; }
     while (c->height < nj.height) { c->height <<= 1; ++yshift; }
-    out = (unsigned char*) njAllocMem(c->width * c->height);
-    if (!out) njThrow(NJ_OUT_OF_MEM);
-    lin = c->pixels;
+    auto out = std::vector<unsigned char>(c->width * c->height);
+    lin = c->pixels.data();
     lout = out;
     for (y = 0;  y < c->height;  ++y) {
         lin = &c->pixels[(y >> yshift) * c->stride];
@@ -810,7 +803,6 @@ static inline void njUpsample(nj_component_t* c) {
         lout += c->width;
     }
     c->stride = c->width;
-    njFreeMem((void*) c->pixels);
     c->pixels = out;
 }
 
@@ -836,10 +828,10 @@ static inline void njConvert(void) {
     if (nj.ncomp == 3) {
         // convert to RGB
         int x, yy;
-        unsigned char *prgb = nj.rgb;
-        const unsigned char *py  = nj.comp[0].pixels;
-        const unsigned char *pcb = nj.comp[1].pixels;
-        const unsigned char *pcr = nj.comp[2].pixels;
+        unsigned char *prgb = nj.rgb.data();
+        const unsigned char *py  = nj.comp[0].pixels.data();
+        const unsigned char *pcb = nj.comp[1].pixels.data();
+        const unsigned char *pcr = nj.comp[2].pixels.data();
         for (yy = nj.height;  yy;  --yy) {
             for (x = 0;  x < nj.width;  ++x) {
                 int y = py[x] << 8;
@@ -872,12 +864,6 @@ void njInit(void) {
 }
 
 void njDone(void) {
-    for (auto& compI: nj.comp) {
-        if (compI.pixels) {
-            njFreeMem((void*)compI.pixels);
-        }
-    }
-    if (nj.rgb) njFreeMem((void*) nj.rgb);
     njInit();
 }
 
@@ -918,7 +904,7 @@ nj_result_t njDecode(FILE* fp, const void* jpeg, const int size) {
 int njGetWidth(void)            { return nj.width; }
 int njGetHeight(void)           { return nj.height; }
 int njIsColor(void)             { return (nj.ncomp != 1); }
-unsigned char* njGetImage(void) { return (nj.ncomp == 1) ? nj.comp[0].pixels : nj.rgb; }
+unsigned char* njGetImage(void) { return (nj.ncomp == 1) ? nj.comp[0].pixels.data() : nj.rgb.data(); }
 int njGetImageSize(void)        { return nj.width * nj.height * nj.ncomp; }
 
 #endif // _NJ_INCLUDE_HEADER_ONLY

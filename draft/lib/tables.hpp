@@ -237,6 +237,16 @@ static const float aasf[] = {
     0.541196100f * 2.828427125f, 0.275899379f * 2.828427125f
 };
 
+static const unsigned char head0[] = {
+    0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, 'J', 'F',  'I',  'F', 0,    1,    1,
+    0,    0,    1,    0,    1, 0,    0,   0xFF, 0xDB, 0,   0x84, 0
+};
+
+static const unsigned char head2[] = {
+    0xFF, 0xDA, 0,    0xC,  3, 1,    0,   2,    0x11, 3,   0x11, 0,    0x3F,
+    0
+};
+
 }
 
 #endif // TABLES_HPP

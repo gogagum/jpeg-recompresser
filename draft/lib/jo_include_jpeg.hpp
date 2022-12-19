@@ -17,13 +17,17 @@
 template <class T>
 bool jo_write_jpg(T iterator, const char *filename, const void *data, int width, int height, int comp, int quality);
 
+bool
+jo_write_headers(std::ofstream& outBinHeaders, const void *data,
+                 int width, int height, int comp, int quality);
+
 template <class T>
-int jo_processDU(T& iterator, FILE *fp, int &bitBuf, int &bitCnt, float *CDU, int du_stride,
+int jo_processDU(T& iterator, std::ofstream& outJpeg, int &bitBuf, int &bitCnt, float *CDU, int du_stride,
                  float *fdtbl, int DC,
                  const unsigned short HTDC[256][2],
                  const unsigned short HTAC[256][2]);
 
-void jo_writeBits(FILE *fp, int &bitBuf, int &bitCnt, const unsigned short *bs);
+void jo_writeBits(std::ofstream& outJpeg, int &bitBuf, int &bitCnt, const unsigned short *bs);
 
 
 static void
@@ -31,24 +35,23 @@ jo_DCT(float &d0, float &d1, float &d2, float &d3, float &d4, float &d5, float &
 
 static void jo_calcBits(int val, unsigned short bits[2]);
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
 template <class T>
-bool jo_write_jpg(T inDCTIterator, const char *filename, const void *data, int width, int height, int comp, int quality) {
-    if (!data || !filename || !width || !height || comp > 4 || comp < 1 || comp == 2) {
+bool jo_write_jpg(T inDCTIterator, std::ofstream& outJpeg, const void *data, int width, int height, int comp, int quality) {
+    if (!data || !width || !height || comp > 4 || comp < 1 || comp == 2) {
         return false;
     }
 
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) {
+    if (!jo_write_headers(outJpeg, data, width, height, comp, quality)) {
         return false;
     }
 
     quality = quality ? quality : 90;
-    int subsample = quality <= 90 ? 1 : 0;
+    const int subsample = quality <= 90 ? 1 : 0;
     quality = quality < 1 ? 1 : quality > 100 ? 100 : quality;
     quality = quality < 50 ? 5000 / quality : 200 - quality * 2;
+
 
     unsigned char YTable[64], UVTable[64];
     for (int i = 0; i < 64; ++i) {
@@ -65,47 +68,6 @@ bool jo_write_jpg(T inDCTIterator, const char *filename, const void *data, int w
             fdtbl_UV[k] = 1 / (UVTable[tbl::s_jo_ZigZag[k]] * tbl::aasf[row] * tbl::aasf[col]);
         }
     }
-
-    // Write Headers
-    static const unsigned char head0[] = {
-        0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, 'J', 'F',  'I',  'F', 0,    1,    1,
-        0,    0,    1,    0,    1, 0,    0,   0xFF, 0xDB, 0,   0x84, 0
-    };
-    fwrite(head0,  sizeof(head0),  1, fp);
-    fwrite(YTable, sizeof(YTable), 1, fp);
-    putc(1, fp);
-    fwrite(UVTable, sizeof(UVTable), 1, fp);
-    unsigned char h1 = height >> 8;
-    unsigned char h2 = height & 0xFF;
-    unsigned char w1 = width >> 8;
-    unsigned char w2 = width & 0xFF;
-    const unsigned char head1[] = {
-        0xFF,0xC0,0,0x11,8,h1,h2,w1,w2,
-        3,1,(unsigned char)(subsample ? 0x22 : 0x11),
-        0,2,0x11,1,3,0x11,1,0xFF,0xC4,0x01,0xA2,0
-    };
-    fwrite(head1, sizeof(head1), 1, fp);
-    fwrite(tbl::std_dc_luminance_nrcodes + 1,
-           sizeof(tbl::std_dc_luminance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_dc_luminance_values,
-           sizeof(tbl::std_dc_luminance_values), 1, fp);
-    putc(0x10, fp); // HTYACinfo
-    fwrite(tbl::std_ac_luminance_nrcodes + 1,
-           sizeof(tbl::std_ac_luminance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_ac_luminance_values,
-           sizeof(tbl::std_ac_luminance_values), 1, fp);
-    putc(1, fp); // HTUDCinfo
-    fwrite(tbl::std_dc_chrominance_nrcodes + 1,
-           sizeof(tbl::std_dc_chrominance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_dc_chrominance_values,
-           sizeof(tbl::std_dc_chrominance_values),      1, fp);
-    putc(0x11, fp); // HTUACinfo
-    fwrite(tbl::std_ac_chrominance_nrcodes + 1,
-           sizeof(tbl::std_ac_chrominance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_ac_chrominance_values,
-           sizeof(tbl::std_ac_chrominance_values), 1, fp);
-    static const unsigned char head2[] = { 0xFF,0xDA,0,0xC,3,1,0,2,0x11,3,0x11,0,0x3F,0 };
-    fwrite(head2, sizeof(head2), 1, fp);
 
     // Encode 8x8 macroblocks
     int ofsG = comp > 1 ? 1 : 0, ofsB = comp > 1 ? 2 : 0;
@@ -129,10 +91,10 @@ bool jo_write_jpg(T inDCTIterator, const char *filename, const void *data, int w
                         V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
-                DCY = jo_processDU(inDCTIterator, fp, bitBuf, bitCnt, Y + 0,   16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(inDCTIterator, fp, bitBuf, bitCnt, Y + 8,   16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(inDCTIterator, fp, bitBuf, bitCnt, Y + 128, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(inDCTIterator, fp, bitBuf, bitCnt, Y + 136, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(inDCTIterator, outJpeg, bitBuf, bitCnt, Y + 0,   16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(inDCTIterator, outJpeg, bitBuf, bitCnt, Y + 8,   16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(inDCTIterator, outJpeg, bitBuf, bitCnt, Y + 128, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(inDCTIterator, outJpeg, bitBuf, bitCnt, Y + 136, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
                 // subsample U,V
                 float subU[64], subV[64];
                 for (int yy = 0, pos = 0; yy < 8; ++yy) {
@@ -142,8 +104,8 @@ bool jo_write_jpg(T inDCTIterator, const char *filename, const void *data, int w
                         subV[pos] = (V[j + 0] + V[j + 1] + V[j + 16] + V[j + 17]) * 0.25f;
                     }
                 }
-                DCU = jo_processDU(inDCTIterator, fp, bitBuf, bitCnt, subU, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = jo_processDU(inDCTIterator, fp, bitBuf, bitCnt, subV, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCU = jo_processDU(inDCTIterator, outJpeg, bitBuf, bitCnt, subU, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = jo_processDU(inDCTIterator, outJpeg, bitBuf, bitCnt, subV, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }
@@ -162,26 +124,29 @@ bool jo_write_jpg(T inDCTIterator, const char *filename, const void *data, int w
                         V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
-                DCY = jo_processDU(inDCTIterator, fp, bitBuf, bitCnt, Y, 8, fdtbl_Y, DCY,  tbl::YDC_HT,  tbl::YAC_HT);
-                DCU = jo_processDU(inDCTIterator, fp, bitBuf, bitCnt, U, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = jo_processDU(inDCTIterator, fp, bitBuf, bitCnt, V, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCY = jo_processDU(inDCTIterator, outJpeg, bitBuf, bitCnt, Y, 8, fdtbl_Y, DCY,  tbl::YDC_HT,  tbl::YAC_HT);
+                DCU = jo_processDU(inDCTIterator, outJpeg, bitBuf, bitCnt, U, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = jo_processDU(inDCTIterator, outJpeg, bitBuf, bitCnt, V, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }
 
     // Do the bit alignment of the EOI marker
     static const unsigned short fillBits[] = { 0x7F, 7 };
-    jo_writeBits(fp, bitBuf, bitCnt, fillBits);
-    putc(0xFF, fp);
-    putc(0xD9, fp);
-    fclose(fp);
+    jo_writeBits(outJpeg, bitBuf, bitCnt, fillBits);
+    outJpeg.put(0xFF);
+    //putc(0xFF, fp);
+    outJpeg.put(0xD9);
+    //putc(0xD9, fp);
+    //fclose(fp);
     return true;
 }
 
 template <class T>
 int jo_processDU(
             T& indctIterator,
-            FILE *fp, int &bitBuf, int &bitCnt, float *CDU, int du_stride,
+            std::ofstream& outJpeg,
+            int &bitBuf, int &bitCnt, float *CDU, int du_stride,
             float *fdtbl, int DC,
             const unsigned short HTDC[256][2],
             const unsigned short HTAC[256][2]) {
@@ -231,13 +196,13 @@ int jo_processDU(
     // Encode DC
     int diff = DU[0] - DC;
     if (diff == 0) {
-        jo_writeBits(fp, bitBuf, bitCnt, HTDC[0]);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, HTDC[0]);
     }
     else {
         unsigned short bits[2];
         jo_calcBits(diff, bits);
-        jo_writeBits(fp, bitBuf, bitCnt, HTDC[bits[1]]);
-        jo_writeBits(fp, bitBuf, bitCnt, bits);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, HTDC[bits[1]]);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, bits);
     }
     // Encode ACs
     int end0pos = 63;
@@ -245,7 +210,7 @@ int jo_processDU(
     }
     // end0pos = first element in reverse order !=0
     if (end0pos == 0) {
-        jo_writeBits(fp, bitBuf, bitCnt, EOB);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, EOB);
         return DU[0];
     }
     for (int i = 1; i <= end0pos; ++i) {
@@ -256,16 +221,16 @@ int jo_processDU(
         if (nrzeroes >= 16) {
             int lng = nrzeroes >> 4;
             for (int nrmarker = 1; nrmarker <= lng; ++nrmarker)
-                jo_writeBits(fp, bitBuf, bitCnt, M16zeroes);
+                jo_writeBits(outJpeg, bitBuf, bitCnt, M16zeroes);
             nrzeroes &= 15;
         }
         unsigned short bits[2];
         jo_calcBits(DU[i], bits);
-        jo_writeBits(fp, bitBuf, bitCnt, HTAC[(nrzeroes << 4) + bits[1]]);
-        jo_writeBits(fp, bitBuf, bitCnt, bits);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, HTAC[(nrzeroes << 4) + bits[1]]);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, bits);
     }
     if (end0pos != 63) {
-        jo_writeBits(fp, bitBuf, bitCnt, EOB);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, EOB);
     }
     return DU[0];
 }

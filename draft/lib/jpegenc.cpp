@@ -27,21 +27,18 @@
 #ifndef JO_JPEG_HEADER_FILE_ONLY
 
 #include <iterator>
-#include <cstdio>
-#include <cstdlib>
-#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <vector>
 
-void jo_writeBits(FILE *fp, int &bitBuf, int &bitCnt, const unsigned short *bs) {
+void jo_writeBits(std::ofstream& outJpeg, int &bitBuf, int &bitCnt, const unsigned short *bs) {
     bitCnt += bs[1];
     bitBuf |= bs[0] << (24 - bitCnt);
     while (bitCnt >= 8) {
         unsigned char c = (bitBuf >> 16) & 255;
-        putc(c, fp);
+        outJpeg.put(c);
         if (c == 255) {
-            putc(0, fp);
+            outJpeg.put(0);
         }
         bitBuf <<= 8;
         bitCnt -= 8;
@@ -103,19 +100,14 @@ static void jo_calcBits(int val, unsigned short bits[2]) {
 }
 
 bool
-jo_write_headers(const char *filename, const void *data,
+jo_write_headers(std::ofstream& outBinHeaders, const void *data,
                  int width, int height, int comp, int quality) {
-    if (!data || !filename || !width || !height || comp > 4 || comp < 1 || comp == 2) {
-        return false;
-    }
-
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) {
+    if (!data || !width || !height || comp > 4 || comp < 1 || comp == 2) {
         return false;
     }
 
     quality = quality ? quality : 90;
-    int subsample = quality <= 90 ? 1 : 0;
+    const int subsample = quality <= 90 ? 1 : 0;
     quality = quality < 1 ? 1 : quality > 100 ? 100 : quality;
     quality = quality < 50 ? 5000 / quality : 200 - quality * 2;
 
@@ -136,14 +128,14 @@ jo_write_headers(const char *filename, const void *data,
     }
 
     // Write Headers
-    static const unsigned char head0[] = {
-        0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, 'J',  'F',  'I', 'F',  0, 1, 1, 0,
-        0,    1,    0,    1,    0, 0,    0xFF,  0xDB, 0,  0x84, 0
+    const auto writeBinHeaders = [&outBinHeaders](const auto* ptr, std::size_t size) {
+        outBinHeaders.write(reinterpret_cast<const char*>(ptr), size);
     };
-    fwrite(head0, sizeof(head0), 1, fp);
-    fwrite(YTable, sizeof(YTable), 1, fp);
-    putc(1, fp);
-    fwrite(UVTable, sizeof(UVTable), 1, fp);
+
+    writeBinHeaders(tbl::head0, sizeof(tbl::head0));
+    writeBinHeaders(YTable, sizeof(YTable));
+    outBinHeaders.put(1);
+    writeBinHeaders(UVTable, sizeof(UVTable));
     unsigned char h1 = height >> 8;
     unsigned char h2 = height & 0xFF;
     unsigned char w1 = width >> 8;
@@ -153,29 +145,26 @@ jo_write_headers(const char *filename, const void *data,
         (unsigned char) (subsample ? 0x22 : 0x11), 0,
         2, 0x11, 1, 3, 0x11, 1, 0xFF, 0xC4, 0x01, 0xA2, 0
     };
-    fwrite(head1, sizeof(head1), 1, fp);
-    fwrite(tbl::std_dc_luminance_nrcodes + 1, sizeof(tbl::std_dc_luminance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_dc_luminance_values, sizeof(tbl::std_dc_luminance_values), 1, fp);
-    putc(0x10, fp); // HTYACinfo
-    fwrite(tbl::std_ac_luminance_nrcodes + 1, sizeof(tbl::std_ac_luminance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_ac_luminance_values, sizeof(tbl::std_ac_luminance_values), 1, fp);
-    putc(1, fp); // HTUDCinfo
-    fwrite(tbl::std_dc_chrominance_nrcodes + 1, sizeof(tbl::std_dc_chrominance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_dc_chrominance_values, sizeof(tbl::std_dc_chrominance_values), 1, fp);
-    putc(0x11, fp); // HTUACinfo
-    fwrite(tbl::std_ac_chrominance_nrcodes + 1, sizeof(tbl::std_ac_chrominance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_ac_chrominance_values, sizeof(tbl::std_ac_chrominance_values), 1, fp);
-    static const unsigned char head2[] = {0xFF, 0xDA, 0, 0xC, 3, 1, 0, 2, 0x11, 3, 0x11, 0, 0x3F, 0};
-    fwrite(head2, sizeof(head2), 1, fp);
+    writeBinHeaders(head1, sizeof(head1));
+    writeBinHeaders(tbl::std_dc_luminance_nrcodes + 1, sizeof(tbl::std_dc_luminance_nrcodes) - 1);
+    writeBinHeaders(tbl::std_dc_luminance_values, sizeof(tbl::std_dc_luminance_values));
+    outBinHeaders.put(0x10); // HTYACinfo
+    writeBinHeaders(tbl::std_ac_luminance_nrcodes + 1, sizeof(tbl::std_ac_luminance_nrcodes) - 1);
+    writeBinHeaders(tbl::std_ac_luminance_values, sizeof(tbl::std_ac_luminance_values));
+    outBinHeaders.put(1); // HTUDCinfo
+    writeBinHeaders(tbl::std_dc_chrominance_nrcodes + 1, sizeof(tbl::std_dc_chrominance_nrcodes) - 1);
+    writeBinHeaders(tbl::std_dc_chrominance_values, sizeof(tbl::std_dc_chrominance_values));
+    outBinHeaders.put(0x11); // HTUACinfo
+    writeBinHeaders(tbl::std_ac_chrominance_nrcodes + 1, sizeof(tbl::std_ac_chrominance_nrcodes) - 1);
+    writeBinHeaders(tbl::std_ac_chrominance_values, sizeof(tbl::std_ac_chrominance_values));
+    writeBinHeaders(tbl::head2, sizeof(tbl::head2));
     return true;
 }
 
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     std::ifstream indct;
     indct.open(argv[1]);
-    //FILE *fp;
     int i;
     char *filename;
     const void *data;
@@ -186,20 +175,16 @@ int main(int argc, char* argv[])
 
     auto buffer = std::vector<unsigned char>(comp * width * height * sizeof(unsigned char));
 
-    // This file is only needed due to the fact that this is an edit of an original Jpeg Encoder
-    // It does not actually affect the output image
-    //fp = fopen("fruits.raw", "rb");
-    //fread(buffer, 1, comp* width*height, fp);
-    //fclose(fp);
-
     std::ofstream outJpeg;
     outJpeg.open(argv[6], std::ios::binary | std::ios::out);
 
-    jo_write_jpg(std::istream_iterator<int>(indct), argv[6], buffer.data(), width, height, comp, quality);
-    jo_write_headers("headers.bin", buffer.data(), width, height, comp, quality);
+    jo_write_jpg(std::istream_iterator<int>(indct), outJpeg, buffer.data(), width, height, comp, quality);
+
+    std::ofstream outBinHeaders;
+    outBinHeaders.open("headers.bin", std::ios::binary | std::ios::out);
+
+    jo_write_headers(outBinHeaders, buffer.data(), width, height, comp, quality);
 
 }
-
-
 
 #endif

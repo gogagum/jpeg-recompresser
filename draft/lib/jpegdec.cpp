@@ -133,7 +133,6 @@ int main(int argc, char* argv[])
 {
 
     int size;
-    char *buf;
     FILE *f;
     FILE* fp = fopen(argv[2], "w+");
     if (argc < 4) {
@@ -147,13 +146,12 @@ int main(int argc, char* argv[])
     }
     fseek(f, 0, SEEK_END);
     size = (int) ftell(f);
-    buf = (char*) malloc(size);
+    auto buf = std::vector<char>(size);
     fseek(f, 0, SEEK_SET);
-    size = (int) fread(buf, 1, size, f);
+    size = (int) fread(buf.data(), 1, size, f);
     fclose(f);
 
-    if (njDecode(fp, buf, size)) {
-        free((void*)buf);
+    if (njDecode(fp, buf.data(), size)) {
         printf("Error decoding the input file.\n");
         return 1;
     }
@@ -164,8 +162,6 @@ int main(int argc, char* argv[])
     dim.open (argv[3]);
     dim << w << " " << h << " "<< argv[4];
     dim.close();
-
-    free((void*)buf);
 
     return 0;
 }

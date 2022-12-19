@@ -16,7 +16,7 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 
 if(Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
-    add_executable(draft-enc draft/lib/jpegenc.cpp)
+    add_executable(draft-enc draft/lib/jpegenc.cpp draft/lib/jo_write_jpeg.cpp)
     add_executable(draft-dec draft/lib/jpegdec.cpp)
 
     install(TARGETS draft-enc draft-dec

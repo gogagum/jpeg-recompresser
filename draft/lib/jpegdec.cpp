@@ -176,12 +176,6 @@ int main(int argc, char* argv[])
 
 #ifndef _NJ_INCLUDE_HEADER_ONLY
 
-#ifdef _MSC_VER
-    #define NJ_FORCE_INLINE static __forceinline
-#else
-    #define NJ_FORCE_INLINE static inline
-#endif
-
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -237,7 +231,7 @@ static const auto njZZ =
                               58, 59, 52, 45, 38, 31, 39, 46,
                               53, 60, 61, 54, 47, 55, 62, 63 };
 
-NJ_FORCE_INLINE unsigned char njClip(const int x) {
+static inline unsigned char njClip(const int x) {
     return (x < 0) ? 0 : ((x > 0xFF) ? 0xFF : (unsigned char) x);
 }
 

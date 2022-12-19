@@ -24,6 +24,9 @@
 #include <iostream>
 #include <fstream>
 #include <array>
+#include <cstring>
+
+#include "tables.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
 // DOCUMENTATION SECTION                                                     //
@@ -118,40 +121,39 @@
 // just define _NJ_EXAMPLE_PROGRAM to compile this                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-#define _NJ_EXAMPLE_PROGRAM
-
-#ifdef  _NJ_EXAMPLE_PROGRAM
 #include <filesystem>
 #include <string>
 #include <vector>
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 int main(int argc, char* argv[])
 {
-
     int size;
-    FILE *f;
-    FILE* fp = fopen(argv[2], "w+");
+
     if (argc < 4) {
         printf("Usage: %s <input.jpg> dct_dump.txt dim.txt quality_of_the_image\n", argv[0]);
         return 2;
     }
-    f = fopen(argv[1], "rb");
-    if (!f) {
+
+    std::ofstream outDCTDump;
+    outDCTDump.open(argv[2], std::ios::out | std::ios::trunc);
+
+    std::ifstream inJpeg;
+    inJpeg.open(argv[1], std::ios::in | std::ios::binary);
+
+    if (!inJpeg.is_open()) {
         printf("Error opening the input file.\n");
         return 1;
     }
-    fseek(f, 0, SEEK_END);
-    size = (int) ftell(f);
-    auto buf = std::vector<char>(size);
-    fseek(f, 0, SEEK_SET);
-    size = (int) fread(buf.data(), 1, size, f);
-    fclose(f);
 
-    if (njDecode(fp, buf.data(), size)) {
+    inJpeg.seekg(0, std::ios::end);
+    auto finSize = inJpeg.tellg();
+    inJpeg.seekg(0, std::ios::beg);
+    auto buf = std::vector<char>(finSize);
+    inJpeg.read(buf.data(), finSize);
+
+    if (njDecode(outDCTDump, buf.data(), finSize)) {
         printf("Error decoding the input file.\n");
         return 1;
     }
@@ -166,8 +168,6 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-#endif
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION SECTION                                                    //
@@ -175,10 +175,6 @@ int main(int argc, char* argv[])
 ///////////////////////////////////////////////////////////////////////////////
 
 #ifndef _NJ_INCLUDE_HEADER_ONLY
-
-#include <cstdlib>
-#include <cstring>
-#include <iostream>
 
 struct nj_vlc_code_t {
     unsigned char bits = 0;
@@ -220,16 +216,6 @@ struct nj_context_t {
 };
 
 nj_context_t nj;
-
-static const auto njZZ =
-        std::array<char, 64>{ 0,  1,  8,  16, 9,  2,  3,  10,
-                              17, 24, 32, 25, 18, 11, 4,  5,
-                              12, 19, 26, 33, 40, 48, 41, 34,
-                              27, 20, 13, 6,  7,  14, 21, 28,
-                              35, 42, 49, 56, 57, 50, 43, 36,
-                              29, 22, 15, 23, 30, 37, 44, 51,
-                              58, 59, 52, 45, 38, 31, 39, 46,
-                              53, 60, 61, 54, 47, 55, 62, 63 };
 
 static inline unsigned char njClip(const int x) {
     return (x < 0) ? 0 : ((x > 0xFF) ? 0xFF : (unsigned char) x);
@@ -561,7 +547,7 @@ static int njGetVLC(nj_vlc_code_t* vlc, unsigned char* code) {
     return value;
 }
 
-static inline void njDecodeBlock(FILE* fp, nj_component_t* c, unsigned char* out)
+static inline void njDecodeBlock(std::ofstream& dump, nj_component_t* c, unsigned char* out)
 {
     unsigned char code = 0;
     int value, coef = 0;
@@ -579,31 +565,16 @@ static inline void njDecodeBlock(FILE* fp, nj_component_t* c, unsigned char* out
 
         if (coef > 63) njThrow(NJ_SYNTAX_ERROR);
 
-        nj.block[(int) njZZ[coef]] = value * 1; //nj.qtab[c->qtsel][coef]
+        nj.block[(int) tbl::njZZ[coef]] = value * 1; //nj.qtab[c->qtsel][coef]
     }
     while (coef < 63);
     unsigned int i = 0;
 
-    //cout <<  &nj.block[i];
     for(i = 0; i < 64; i++) {
-
-        fprintf(fp, "%d ", nj.block[i]);
-        printf("%d ", nj.block[i]);
-
-        //cout << nj.block[i];
+        dump << nj.block[i] << ' ';
+        std::cout << nj.block[i] << ' ';
     }
-    //fprintf(fp, "\n", nj.block[i]);
     std::cout << std::endl;
-
-    /*for (coef = 0; coef <  64; coef ++)
-    {
-        int* zz = &nj.block[coef];
-        //std::cout << sizeof(zz)  << " ";
-        for (int coef2 = 0; coef2 < 8; coef2 ++) {
-            std::cout << zz[coef2] << " ";
-        }
-        std::cout << " \n";
-    }*/
 
     for (auto& blk: nj.block) {
         njRowIDCT(&blk);
@@ -614,7 +585,7 @@ static inline void njDecodeBlock(FILE* fp, nj_component_t* c, unsigned char* out
     }
 }
 
-static inline void njDecodeScan(FILE* fp) {
+static inline void njDecodeScan(std::ofstream& dump) {
     int i, mbx, mby, sbx, sby;
     int rstcount = nj.rstinterval, nextrst = 0;
     nj_component_t* c;
@@ -636,7 +607,7 @@ static inline void njDecodeScan(FILE* fp) {
         for (i = 0, c = nj.comp.data();  i < nj.ncomp;  ++i, ++c)
             for (sby = 0;  sby < c->ssy;  ++sby)
                 for (sbx = 0;  sbx < c->ssx;  ++sbx) {
-                    njDecodeBlock(fp, c, &c->pixels[((mby * c->ssy + sby) * c->stride + mbx * c->ssx + sbx) << 3]);
+                    njDecodeBlock(dump, c, &c->pixels[((mby * c->ssy + sby) * c->stride + mbx * c->ssx + sbx) << 3]);
                     njCheckError();
                 }
         if (++mbx >= nj.mbwidth) {
@@ -798,7 +769,7 @@ static inline void njConvert(void) {
     }
 }
 
-nj_result_t njDecode(FILE* fp, const void* jpeg, const int size) {
+nj_result_t njDecode(std::ofstream& dump, const void* jpeg, const int size) {
     nj.pos = (const unsigned char*) jpeg;
     nj.size = size & 0x7FFFFFFF;
     if (nj.size < 2) {
@@ -816,7 +787,7 @@ nj_result_t njDecode(FILE* fp, const void* jpeg, const int size) {
             case 0xC4: njDecodeDHT();  break;
             case 0xDB: njDecodeDQT();  break;
             case 0xDD: njDecodeDRI();  break;
-            case 0xDA: njDecodeScan(fp); break;
+            case 0xDA: njDecodeScan(dump); break;
             case 0xFE: njSkipMarker(); break;
             default:
                 if ((nj.pos[-1] & 0xF0) == 0xE0)

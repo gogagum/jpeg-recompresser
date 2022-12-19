@@ -1,6 +1,7 @@
 #ifndef _NANOJPEG_HPP
 #define _NANOJPEG_HPP
 
+#include <fstream>
 #include <cstdio>
 
 // nj_result_t: Result codes for njDecode().
@@ -25,7 +26,7 @@ void njInit(void);
 //   jpeg = The pointer to the memory dump.
 //   size = The size of the JPEG file.
 // Return value: The error code in case of failure, or NJ_OK (zero) on success.
-nj_result_t njDecode(FILE* fp, const void* jpeg, const int size);
+nj_result_t njDecode(std::ofstream& dump, const void* jpeg, const int size);
 
 // njGetWidth: Return the width (in pixels) of the most recently decoded
 // image. If njDecode() failed, the result of njGetWidth() is undefined.

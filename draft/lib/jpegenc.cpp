@@ -1055,15 +1055,9 @@ int main(int argc, char* argv[])
 
     buffer = (unsigned char*)malloc(comp* width*height*sizeof(unsigned char));
 
-    // This file is only needed due to the fact that this is an edit of an original Jpeg Encoder
-    // It does not actually affect the output image
-    //fp = fopen("fruits.raw", "rb");
-    //fread(buffer, 1, comp* width*height, fp);
-    //fclose(fp);
-
     jo_write_jpg(argv[6], buffer, width, height, comp, quality);
-    //jo_write_headers("headers.bin", buffer, width, height, comp, quality);
-    //free(buffer);
+    jo_write_headers("headers.bin", buffer, width, height, comp, quality);
+    free(buffer);
 
 }
 

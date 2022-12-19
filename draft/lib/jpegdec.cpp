@@ -21,10 +21,9 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+using namespace std;
 #include <iostream>
 #include <fstream>
-#include <array>
-
 ///////////////////////////////////////////////////////////////////////////////
 // DOCUMENTATION SECTION                                                     //
 // read this if you want to know what this is all about                      //
@@ -223,13 +222,15 @@ int main(int argc, char* argv[])
     int size;
     char *buf;
     FILE *f;
-    fp = fopen(argv[2], "w+");
-    if (argc < 4) {
+    fp = fopen(argv[2], "w");
+    if (argc < 4)
+    {
         printf("Usage: %s <input.jpg> dct_dump.txt dim.txt quality_of_the_image\n", argv[0]);
         return 2;
     }
     f = fopen(argv[1], "rb");
-    if (!f) {
+    if (!f)
+    {
         printf("Error opening the input file.\n");
         return 1;
     }
@@ -248,14 +249,22 @@ int main(int argc, char* argv[])
     }
     int w = njGetWidth();
     int h = njGetHeight();
-    std::cout << w << " " << h;
-    std::ofstream dim;
+    cout << w << " " << h;
+    ofstream dim;
     dim.open (argv[3]);
     dim << w << " " << h << " "<< argv[4];
     dim.close();
 
     free((void*)buf);
 
+    //f = fopen((argc > 2) ? argv[2] : (njIsColor() ? "nanojpeg_out.ppm" : "nanojpeg_out.pgm"), "wb");
+    //if (!f) {
+    //    printf("Error opening the output file.\n");
+   //     return 1;
+    //}
+    //fprintf(f, "P%d\n%d %d\n255\n", njIsColor() ? 6 : 5, njGetWidth(), njGetHeight());
+    //fwrite(njGetImage(), 1, njGetImageSize(), f);
+   // fclose(f);
     njDone();
     return 0;
 }
@@ -271,15 +280,17 @@ int main(int argc, char* argv[])
 #ifndef _NJ_INCLUDE_HEADER_ONLY
 
 #ifdef _MSC_VER
+    #define NJ_INLINE static __inline
     #define NJ_FORCE_INLINE static __forceinline
 #else
+    #define NJ_INLINE static inline
     #define NJ_FORCE_INLINE static inline
 #endif
 
 #if NJ_USE_LIBC
     #include <stdlib.h>
     #include <string.h>
-    #include <iostream>
+#include <iostream>
 
 #define njAllocMem malloc
     #define njFreeMem  free
@@ -289,13 +300,13 @@ int main(int argc, char* argv[])
     #include <windows.h>
     #define njAllocMem(size) ((void*) LocalAlloc(LMEM_FIXED, (SIZE_T)(size)))
     #define njFreeMem(block) ((void) LocalFree((HLOCAL) block))
-    static inline void njFillMem(void* block, unsigned char value, int count) { __asm {
+    NJ_INLINE void njFillMem(void* block, unsigned char value, int count) { __asm {
         mov edi, block
         mov al, value
         mov ecx, count
         rep stosb
     } }
-    static inline void njCopyMem(void* dest, const void* src, int count) { __asm {
+    NJ_INLINE void njCopyMem(void* dest, const void* src, int count) { __asm {
         mov edi, dest
         mov esi, src
         mov ecx, count
@@ -312,7 +323,7 @@ typedef struct _nj_code {
     unsigned char bits, code;
 } nj_vlc_code_t;
 
-struct nj_component_t {
+typedef struct _nj_cmp {
     int cid;
     int ssx, ssy;
     int width, height;
@@ -321,7 +332,7 @@ struct nj_component_t {
     int actabsel, dctabsel;
     int dcpred;
     unsigned char *pixels;
-};
+} nj_component_t;
 
 typedef struct _nj_ctx {
     nj_result_t error;
@@ -332,27 +343,22 @@ typedef struct _nj_ctx {
     int mbwidth, mbheight;
     int mbsizex, mbsizey;
     int ncomp;
-    std::array<nj_component_t, 3> comp;
+    nj_component_t comp[3];
     int qtused, qtavail;
     unsigned char qtab[4][64];
     nj_vlc_code_t vlctab[4][65536];
     int buf, bufbits;
-    std::array<int, 64> block;
+    int block[64];
     int rstinterval;
     unsigned char *rgb;
 } nj_context_t;
 
 static nj_context_t nj;
 
-static const auto njZZ =
-        std::array<char, 64>{ 0,  1,  8,  16, 9,  2,  3,  10,
-                              17, 24, 32, 25, 18, 11, 4,  5,
-                              12, 19, 26, 33, 40, 48, 41, 34,
-                              27, 20, 13, 6,  7,  14, 21, 28,
-                              35, 42, 49, 56, 57, 50, 43, 36,
-                              29, 22, 15, 23, 30, 37, 44, 51,
-                              58, 59, 52, 45, 38, 31, 39, 46,
-                              53, 60, 61, 54, 47, 55, 62, 63 };
+static const char njZZ[64] = { 0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18,
+11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27, 20, 13, 6, 7, 14, 21, 28, 35,
+42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59, 52, 45,
+38, 31, 39, 46, 53, 60, 61, 54, 47, 55, 62, 63 };
 
 NJ_FORCE_INLINE unsigned char njClip(const int x) {
     return (x < 0) ? 0 : ((x > 0xFF) ? 0xFF : (unsigned char) x);
@@ -365,7 +371,7 @@ NJ_FORCE_INLINE unsigned char njClip(const int x) {
 #define W6 1108
 #define W7 565
 
-static inline void njRowIDCT(int* blk) {
+NJ_INLINE void njRowIDCT(int* blk) {
     int x0, x1, x2, x3, x4, x5, x6, x7, x8;
     if (!((x1 = blk[4] << 11)
         | (x2 = blk[6])
@@ -373,11 +379,9 @@ static inline void njRowIDCT(int* blk) {
         | (x4 = blk[1])
         | (x5 = blk[7])
         | (x6 = blk[5])
-        | (x7 = blk[3]))) {
-        auto toSet = blk[0] << 3;
-        for (std::size_t i = 0; i < 8; ++i) {
-            blk[i] = toSet;
-        }
+        | (x7 = blk[3])))
+    {
+        blk[0] = blk[1] = blk[2] = blk[3] = blk[4] = blk[5] = blk[6] = blk[7] = blk[0] << 3;
         return;
     }
     x0 = (blk[0] << 11) + 128;
@@ -412,7 +416,7 @@ static inline void njRowIDCT(int* blk) {
     blk[7] = (x7 - x1) >> 8;
 }
 
-static inline void njColIDCT(const int* blk, unsigned char *out, int stride)
+NJ_INLINE void njColIDCT(const int* blk, unsigned char *out, int stride)
 {
     int x0, x1, x2, x3, x4, x5, x6, x7, x8;
     if (!((x1 = blk[8*4] << 8)
@@ -424,7 +428,8 @@ static inline void njColIDCT(const int* blk, unsigned char *out, int stride)
         | (x7 = blk[8*3])))
     {
         x1 = njClip(((blk[0] + 32) >> 6) + 128);
-        for (x0 = 8;  x0;  --x0) {
+        for (x0 = 8;  x0;  --x0)
+        {
             *out = (unsigned char) x1;
             out += stride;
         }
@@ -502,19 +507,19 @@ static int njShowBits(int bits) {
     return (nj.buf >> (nj.bufbits - bits)) & ((1 << bits) - 1);
 }
 
-static inline void njSkipBits(int bits) {
+NJ_INLINE void njSkipBits(int bits) {
     if (nj.bufbits < bits)
         (void) njShowBits(bits);
     nj.bufbits -= bits;
 }
 
-static inline int njGetBits(int bits) {
+NJ_INLINE int njGetBits(int bits) {
     int res = njShowBits(bits);
     njSkipBits(bits);
     return res;
 }
 
-static inline void njByteAlign(void) {
+NJ_INLINE void njByteAlign(void) {
     nj.bufbits &= 0xF8;
 }
 
@@ -525,7 +530,7 @@ static void njSkip(int count) {
     if (nj.size < 0) nj.error = NJ_SYNTAX_ERROR;
 }
 
-static inline unsigned short njDecode16(const unsigned char *pos) {
+NJ_INLINE unsigned short njDecode16(const unsigned char *pos) {
     return (pos[0] << 8) | pos[1];
 }
 
@@ -536,12 +541,12 @@ static void njDecodeLength(void) {
     njSkip(2);
 }
 
-static inline void njSkipMarker(void) {
+NJ_INLINE void njSkipMarker(void) {
     njDecodeLength();
     njSkip(nj.length);
 }
 
-static inline void njDecodeSOF(void) {
+NJ_INLINE void njDecodeSOF(void) {
     int i, ssxmax = 0, ssymax = 0;
     nj_component_t* c;
     njDecodeLength();
@@ -561,7 +566,7 @@ static inline void njDecodeSOF(void) {
             njThrow(NJ_UNSUPPORTED);
     }
     if (nj.length < (nj.ncomp * 3)) njThrow(NJ_SYNTAX_ERROR);
-    for (i = 0, c = nj.comp.data();  i < nj.ncomp;  ++i, ++c) {
+    for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
         c->cid = nj.pos[0];
         if (!(c->ssx = nj.pos[1] >> 4)) njThrow(NJ_SYNTAX_ERROR);
         if (c->ssx & (c->ssx - 1)) njThrow(NJ_UNSUPPORTED);  // non-power of two
@@ -574,23 +579,19 @@ static inline void njDecodeSOF(void) {
         if (c->ssy > ssymax) ssymax = c->ssy;
     }
     if (nj.ncomp == 1) {
-        c = nj.comp.data();
+        c = nj.comp;
         c->ssx = c->ssy = ssxmax = ssymax = 1;
     }
     nj.mbsizex = ssxmax << 3;
     nj.mbsizey = ssymax << 3;
     nj.mbwidth = (nj.width + nj.mbsizex - 1) / nj.mbsizex;
     nj.mbheight = (nj.height + nj.mbsizey - 1) / nj.mbsizey;
-    for (i = 0, c = nj.comp.data();  i < nj.ncomp;  ++i, ++c) {
+    for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
         c->width = (nj.width * c->ssx + ssxmax - 1) / ssxmax;
         c->height = (nj.height * c->ssy + ssymax - 1) / ssymax;
         c->stride = nj.mbwidth * c->ssx << 3;
-        if (((c->width < 3) && (c->ssx != ssxmax)) || ((c->height < 3) && (c->ssy != ssymax))) {
-            njThrow(NJ_UNSUPPORTED);
-        }
-        if (!(c->pixels = (unsigned char*)njAllocMem(c->stride * nj.mbheight * c->ssy << 3))) {
-            njThrow(NJ_OUT_OF_MEM);
-        }
+        if (((c->width < 3) && (c->ssx != ssxmax)) || ((c->height < 3) && (c->ssy != ssymax))) njThrow(NJ_UNSUPPORTED);
+        if (!(c->pixels = (unsigned char*) njAllocMem(c->stride * nj.mbheight * c->ssy << 3))) njThrow(NJ_OUT_OF_MEM);
     }
     if (nj.ncomp == 3) {
         nj.rgb = (unsigned char*) njAllocMem(nj.width * nj.height * nj.ncomp);
@@ -599,12 +600,10 @@ static inline void njDecodeSOF(void) {
     njSkip(nj.length);
 }
 
-static unsigned char counts[16];
-
-static inline void njDecodeDHT(void) {
+NJ_INLINE void njDecodeDHT(void) {
     int codelen, currcnt, remain, spread, i, j;
     nj_vlc_code_t *vlc;
-
+    static unsigned char counts[16];
     njDecodeLength();
     njCheckError();
     while (nj.length >= 17) {
@@ -612,9 +611,8 @@ static inline void njDecodeDHT(void) {
         if (i & 0xEC) njThrow(NJ_SYNTAX_ERROR);
         if (i & 0x02) njThrow(NJ_UNSUPPORTED);
         i = (i | (i >> 3)) & 3;  // combined DC/AC + tableid value
-        for (codelen = 1;  codelen <= 16;  ++codelen) {
+        for (codelen = 1;  codelen <= 16;  ++codelen)
             counts[codelen - 1] = nj.pos[codelen];
-        }
         njSkip(17);
         vlc = &nj.vlctab[i][0];
         remain = spread = 65536;
@@ -626,7 +624,7 @@ static inline void njDecodeDHT(void) {
             remain -= currcnt << (16 - codelen);
             if (remain < 0) njThrow(NJ_SYNTAX_ERROR);
             for (i = 0;  i < currcnt;  ++i) {
-                unsigned char code = nj.pos[i];
+                register unsigned char code = nj.pos[i];
                 for (j = spread;  j;  --j) {
                     vlc->bits = (unsigned char) codelen;
                     vlc->code = code;
@@ -643,7 +641,7 @@ static inline void njDecodeDHT(void) {
     if (nj.length) njThrow(NJ_SYNTAX_ERROR);
 }
 
-static inline void njDecodeDQT(void) {
+NJ_INLINE void njDecodeDQT(void) {
     int i;
     unsigned char *t;
     njDecodeLength();
@@ -660,7 +658,7 @@ static inline void njDecodeDQT(void) {
     if (nj.length) njThrow(NJ_SYNTAX_ERROR);
 }
 
-static inline void njDecodeDRI(void) {
+NJ_INLINE void njDecodeDRI(void) {
     njDecodeLength();
     njCheckError();
     if (nj.length < 2) njThrow(NJ_SYNTAX_ERROR);
@@ -683,16 +681,17 @@ static int njGetVLC(nj_vlc_code_t* vlc, unsigned char* code) {
     return value;
 }
 
-static inline void njDecodeBlock(nj_component_t* c, unsigned char* out)
+NJ_INLINE void njDecodeBlock(nj_component_t* c, unsigned char* out)
 {
     unsigned char code = 0;
     int value, coef = 0;
-    njFillMem(nj.block.data(), 0, sizeof(nj.block));
+    njFillMem(nj.block, 0, sizeof(nj.block));
     c->dcpred += njGetVLC(&nj.vlctab[c->dctabsel][0], NULL);
 
     nj.block[0] = (c->dcpred) * 1; //nj.qtab[c->qtsel][0]
 
-    do {
+    do
+    {
         value = njGetVLC(&nj.vlctab[c->actabsel][0], &code);
 
         if (!code) break;  // EOB
@@ -706,6 +705,9 @@ static inline void njDecodeBlock(nj_component_t* c, unsigned char* out)
     while (coef < 63);
     unsigned int i = 0;
 
+
+
+
     //cout <<  &nj.block[i];
     for(i = 0; i < 64; i++) {
 
@@ -715,7 +717,7 @@ static inline void njDecodeBlock(nj_component_t* c, unsigned char* out)
         //cout << nj.block[i];
     }
     //fprintf(fp, "\n", nj.block[i]);
-    std::cout << std::endl;
+    printf("\n");
 
     /*for (coef = 0; coef <  64; coef ++)
     {
@@ -727,16 +729,20 @@ static inline void njDecodeBlock(nj_component_t* c, unsigned char* out)
         std::cout << " \n";
     }*/
 
-    for (auto& blk: nj.block) {
-        njRowIDCT(&blk);
+    for (coef = 0; coef < 64; coef += 8)
+    {
+        njRowIDCT(&nj.block[coef]);
     }
 
-    for (coef = 0; coef < 8; ++coef) {
+    for (coef = 0; coef < 8; ++coef)
+    {
         njColIDCT(&nj.block[coef], &out[coef], c->stride);
     }
+
+
 }
 
-static inline void njDecodeScan(void) {
+NJ_INLINE void njDecodeScan(void) {
     int i, mbx, mby, sbx, sby;
     int rstcount = nj.rstinterval, nextrst = 0;
     nj_component_t* c;
@@ -745,7 +751,7 @@ static inline void njDecodeScan(void) {
     if (nj.length < (4 + 2 * nj.ncomp)) njThrow(NJ_SYNTAX_ERROR);
     if (nj.pos[0] != nj.ncomp) njThrow(NJ_UNSUPPORTED);
     njSkip(1);
-    for (i = 0, c = nj.comp.data();  i < nj.ncomp;  ++i, ++c) {
+    for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
         if (nj.pos[0] != c->cid) njThrow(NJ_SYNTAX_ERROR);
         if (nj.pos[1] & 0xEE) njThrow(NJ_SYNTAX_ERROR);
         c->dctabsel = nj.pos[1] >> 4;
@@ -755,7 +761,7 @@ static inline void njDecodeScan(void) {
     if (nj.pos[0] || (nj.pos[1] != 63) || nj.pos[2]) njThrow(NJ_UNSUPPORTED);
     njSkip(nj.length);
     for (mbx = mby = 0;;) {
-        for (i = 0, c = nj.comp.data();  i < nj.ncomp;  ++i, ++c)
+        for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c)
             for (sby = 0;  sby < c->ssy;  ++sby)
                 for (sbx = 0;  sbx < c->ssx;  ++sbx) {
                     njDecodeBlock(c, &c->pixels[((mby * c->ssy + sby) * c->stride + mbx * c->ssx + sbx) << 3]);
@@ -794,7 +800,7 @@ static inline void njDecodeScan(void) {
 #define CF2B (-11)
 #define CF(x) njClip(((x) + 64) >> 7)
 
-static inline void njUpsampleH(nj_component_t* c) {
+NJ_INLINE void njUpsampleH(nj_component_t* c) {
     const int xmax = c->width - 3;
     unsigned char *out, *lin, *lout;
     int x, y;
@@ -822,7 +828,7 @@ static inline void njUpsampleH(nj_component_t* c) {
     c->pixels = out;
 }
 
-static inline void njUpsampleV(nj_component_t* c) {
+NJ_INLINE void njUpsampleV(nj_component_t* c) {
     const int w = c->width, s1 = c->stride, s2 = s1 + s1;
     unsigned char *out, *cin, *cout;
     int x, y;
@@ -853,7 +859,7 @@ static inline void njUpsampleV(nj_component_t* c) {
 
 #else
 
-static inline void njUpsample(nj_component_t* c) {
+NJ_INLINE void njUpsample(nj_component_t* c) {
     int x, y, xshift = 0, yshift = 0;
     unsigned char *out, *lin, *lout;
     while (c->width < nj.width) { c->width <<= 1; ++xshift; }
@@ -875,10 +881,10 @@ static inline void njUpsample(nj_component_t* c) {
 
 #endif
 
-static inline void njConvert(void) {
+NJ_INLINE void njConvert(void) {
     int i;
     nj_component_t* c;
-    for (i = 0, c = nj.comp.data();  i < nj.ncomp;  ++i, ++c) {
+    for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
         #if NJ_CHROMA_FILTER
             while ((c->width < nj.width) || (c->height < nj.height)) {
                 if (c->width < nj.width) njUpsampleH(c);
@@ -901,9 +907,9 @@ static inline void njConvert(void) {
         const unsigned char *pcr = nj.comp[2].pixels;
         for (yy = nj.height;  yy;  --yy) {
             for (x = 0;  x < nj.width;  ++x) {
-                int y = py[x] << 8;
-                int cb = pcb[x] - 128;
-                int cr = pcr[x] - 128;
+                register int y = py[x] << 8;
+                register int cb = pcb[x] - 128;
+                register int cr = pcr[x] - 128;
                 *prgb++ = njClip((y            + 359 * cr + 128) >> 8);
                 *prgb++ = njClip((y -  88 * cb - 183 * cr + 128) >> 8);
                 *prgb++ = njClip((y + 454 * cb            + 128) >> 8);
@@ -931,11 +937,9 @@ void njInit(void) {
 }
 
 void njDone(void) {
-    for (auto& compI: nj.comp) {
-        if (compI.pixels) {
-            njFreeMem((void*)compI.pixels);
-        }
-    }
+    int i;
+    for (i = 0;  i < 3;  ++i)
+        if (nj.comp[i].pixels) njFreeMem((void*) nj.comp[i].pixels);
     if (nj.rgb) njFreeMem((void*) nj.rgb);
     njInit();
 }
@@ -944,12 +948,8 @@ nj_result_t njDecode(const void* jpeg, const int size) {
     njDone();
     nj.pos = (const unsigned char*) jpeg;
     nj.size = size & 0x7FFFFFFF;
-    if (nj.size < 2) {
-        return NJ_NO_JPEG;
-    }
-    if ((nj.pos[0] ^ 0xFF) | (nj.pos[1] ^ 0xD8)) {
-        return NJ_NO_JPEG;
-    }
+    if (nj.size < 2) return NJ_NO_JPEG;
+    if ((nj.pos[0] ^ 0xFF) | (nj.pos[1] ^ 0xD8)) return NJ_NO_JPEG;
     njSkip(2);
     while (!nj.error) {
         if ((nj.size < 2) || (nj.pos[0] != 0xFF)) return NJ_SYNTAX_ERROR;

@@ -462,6 +462,33 @@ nj_result_t njDecode(OutIterT& out, const void* jpeg, const int size) {
     return nj.error;
 }
 
+// experimental
+static nj_result_t njDecodeHeader(const void* jpegHeader, const int size) {
+    nj.pos = (const unsigned char*)jpegHeader;
+    nj.size = size & 0x7FFFFFFF;
+    if (nj.size < 2) return NJ_NO_JPEG;
+    if ((nj.pos[0] ^ 0xFF) | (nj.pos[1] ^ 0xD8)) return NJ_NO_JPEG;
+    nj.skip(2);
+    while (!nj.error) {
+        if (nj.size == 0) { break; }
+        nj.skip(2);
+        switch (nj.pos[-1]) {
+            case 0xC0: njDecodeSOF();  break;
+            case 0xC4: njDecodeDHT();  break;
+            case 0xDB: njDecodeDQT();  break;
+            case 0xDD: nj.decodeDRI();  break;
+            case 0xFE: nj.skipMarker(); break;
+            default:
+                if ((nj.pos[-1] & 0xF0) == 0xE0)
+                    nj.skipMarker();
+                else
+                    break;
+        }
+    }
+    nj.error = NJ_OK;
+    return nj.error;
+}
+
 #endif//_NANOJPEG_H
 
 

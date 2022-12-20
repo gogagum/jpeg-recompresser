@@ -76,19 +76,8 @@
 #include <iterator>
 #include <algorithm>
 
-int main(int argc, char* argv[])
-{
-
-    int size;
-    if (argc < 4) {
-        std::cout << "Usage: " << argv[0]
-                  << " <input.jpg> dct_dump.txt dim.txt quality_of_the_image"
-                  << std::endl;
-        return 2;
-    }
-
-    // open the file:
-    std::ifstream inJpeg(argv[1], std::ios::binary);
+std::vector<char> readFileBuff(const std::string& filename) {
+    std::ifstream inJpeg(filename, std::ios::binary);
 
     // Stop eating new lines in binary mode!!!
     inJpeg.unsetf(std::ios::skipws);
@@ -108,7 +97,21 @@ int main(int argc, char* argv[])
     buff.insert(buff.begin(),
                std::istream_iterator<char>(inJpeg),
                std::istream_iterator<char>());
+    return buff;
+}
 
+int main(int argc, char* argv[])
+{
+
+    int size;
+    if (argc < 4) {
+        std::cout << "Usage: " << argv[0]
+                  << " <input.jpg> dct_dump.txt dim.txt quality_of_the_image"
+                  << std::endl;
+        return 2;
+    }
+
+    auto buff = readFileBuff(argv[1]);
 
     std::ofstream outBlocks;
     outBlocks.open(argv[2], std::ios::out | std::ios::trunc);
@@ -122,14 +125,17 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto minBlk = *std::min_element(blocks.begin(), blocks.end());
-    std::cout << minBlk << std::endl;
-
-    auto maxBlk = *std::max_element(blocks.begin(), blocks.end());
-    std::cout << maxBlk << std::endl;
-
     for (auto block: blocks) {
         outBlocks << block << ' ';
+    }
+
+    nj = nj_context_t{};
+
+    auto headerBuff = readFileBuff("headers.bin");
+
+    if (njDecodeHeader(headerBuff.data(), headerBuff.size())) {
+        std::cout << "Error decoding header." << std::endl;
+        return 1;
     }
 
     int w = nj.getWidth();

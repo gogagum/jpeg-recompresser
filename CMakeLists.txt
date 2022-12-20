@@ -17,7 +17,7 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 if(Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
     add_executable(draft-enc draft/lib/jpegenc.cpp)
-    add_executable(draft-dec draft/lib/jpegdec.cpp)
+    add_executable(draft-dec draft/lib/jpegdec.cpp draft/lib/dec/nanojpeg.cpp)
 
     install(TARGETS draft-enc draft-dec
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

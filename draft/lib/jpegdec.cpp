@@ -21,11 +21,6 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <cstring>
-
 ///////////////////////////////////////////////////////////////////////////////
 // DOCUMENTATION SECTION                                                     //
 // read this if you want to know what this is all about                      //
@@ -72,38 +67,12 @@
 //
 // For API documentation, read the "header section" below.
 
-
-// EXAMPLE
-// =======
-//
-// A few pages below, you can find an example program that uses NanoJPEG to
-// convert JPEG files into PGM or PPM. To compile it, use something like
-//     gcc -O3 -D_NJ_EXAMPLE_PROGRAM -o nanojpeg nanojpeg.c
-// You may also add -std=c99 -Wall -Wextra -pedantic -Werror, if you want :)
-// The only thing you might need is -Wno-shift-negative-value, because this
-// code relies on the target machine using two's complement arithmetic, but
-// the C standard does not, even though *any* practically useful machine
-// nowadays uses two's complement.
-
-
 #include "dec/nanojpeg.h"
 
-
-///////////////////////////////////////////////////////////////////////////////
-// CONFIGURATION SECTION                                                     //
-// adjust the default settings for the NJ_ defines here                      //
-///////////////////////////////////////////////////////////////////////////////
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// EXAMPLE PROGRAM                                                           //
-// just define _NJ_EXAMPLE_PROGRAM to compile this (requires NJ_USE_LIBC)    //
-///////////////////////////////////////////////////////////////////////////////
-
-#include <filesystem>
 #include <iostream>
+#include <fstream>
 #include <string>
+#include <vector>
 
 #include <stdio.h>
 #include <stdlib.h>

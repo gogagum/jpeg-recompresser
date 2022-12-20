@@ -31,7 +31,8 @@
  // then include jo_jpeg.c from it.
 
  // Returns false on failure
-bool jo_write_jpg(const char *filename, const void *data, int width, int height, int comp, int quality);
+bool jo_write_jpg(const char *filename, const void *data, int width, int height,
+                  int comp, int quality);
 
 #endif // JO_INCLUDE_JPEG_H
 
@@ -40,11 +41,12 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
 #include <iostream>
 #include <vector>
 #include <fstream>
+#include <iterator>
 #include "enc/tables.hpp"
 
 FILE *fp2;
 
-std::ifstream indct;
+//std::ifstream indct;
 
 static void jo_writeBits(std::ofstream& outFile, int &bitBuf, int &bitCnt,
                          const unsigned short *bs) {
@@ -115,28 +117,37 @@ static void jo_calcBits(int val, unsigned short bits[2]) {
     bits[0] = val & ((1 << bits[1]) - 1);
 }
 
-static int jo_processDU(std::ofstream& outJpeg, int &bitBuf, int &bitCnt, float *CDU, int du_stride, float *fdtbl, int DC, const unsigned short HTDC[256][2], const unsigned short HTAC[256][2]) {
+template <std::input_iterator IteratorT>
+static int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
+                        int &bitBuf, int &bitCnt, float *CDU, int du_stride,
+                        float *fdtbl, int DC,
+                        const unsigned short HTDC[256][2],
+                        const unsigned short HTAC[256][2]) {
     const unsigned short EOB[2] = { HTAC[0x00][0], HTAC[0x00][1] };
     const unsigned short M16zeroes[2] = { HTAC[0xF0][0], HTAC[0xF0][1] };
 
     // DCT rows
     for (int i = 0; i < du_stride * 8; i += du_stride) {
-        jo_DCT(CDU[i], CDU[i + 1], CDU[i + 2], CDU[i + 3], CDU[i + 4], CDU[i + 5], CDU[i + 6], CDU[i + 7]);
+        jo_DCT(CDU[i],     CDU[i + 1], CDU[i + 2], CDU[i + 3],
+               CDU[i + 4], CDU[i + 5], CDU[i + 6], CDU[i + 7]);
     }
     // DCT columns
     for (int i = 0; i < 8; ++i) {
-        jo_DCT(CDU[i], CDU[i + du_stride], CDU[i + du_stride * 2], CDU[i + du_stride * 3], CDU[i + du_stride * 4], CDU[i + du_stride * 5], CDU[i + du_stride * 6], CDU[i + du_stride * 7]);
+        jo_DCT(CDU[i],                 CDU[i + du_stride],
+               CDU[i + du_stride * 2], CDU[i + du_stride * 3],
+               CDU[i + du_stride * 4], CDU[i + du_stride * 5],
+               CDU[i + du_stride * 6], CDU[i + du_stride * 7]);
     }
 
     // Quantize/descale/zigzag the coefficients
     int DU[64];
     for (int y = 0, j = 0; y < 8; ++y) {
         for (int x = 0; x < 8; ++x, ++j) {
-            int n;
-            indct >> n;
+            int n = *inDCT;
+            ++inDCT;
 
             std::cout << " " << n;
-            DU[tbl::s_jo_ZigZag[j]] =n;// (int)(v < 0 ? ceilf(v - 0.5f) : floorf(v + 0.5f));
+            DU[tbl::s_jo_ZigZag[j]] = n;// (int)(v < 0 ? ceilf(v - 0.5f) : floorf(v + 0.5f));
         }
     }
     std::cout << "\n";
@@ -249,7 +260,9 @@ bool jo_write_headers(std::ofstream& outBinary, int width, int height,
     return true;
 }
 
-bool jo_write_jpg(std::ofstream& outJpeg, const void *data, int width, int height, int comp, int quality) {
+template <std::input_iterator IteratorT>
+bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
+                  int width, int height, int comp, int quality) {
     if (!data || !width || !height || comp > 4 || comp < 1 || comp == 2) {
         return false;
     }
@@ -301,10 +314,10 @@ bool jo_write_jpg(std::ofstream& outJpeg, const void *data, int width, int heigh
                         V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
-                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y + 0, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y + 8, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y + 128, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y + 136, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y + 0, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y + 8, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y + 128, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y + 136, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
                 // subsample U,V
                 float subU[64], subV[64];
                 for (int yy = 0, pos = 0; yy < 8; ++yy) {
@@ -314,8 +327,8 @@ bool jo_write_jpg(std::ofstream& outJpeg, const void *data, int width, int heigh
                         subV[pos] = (V[j + 0] + V[j + 1] + V[j + 16] + V[j + 17]) * 0.25f;
                     }
                 }
-                DCU = jo_processDU(outJpeg, bitBuf, bitCnt, subU, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = jo_processDU(outJpeg, bitBuf, bitCnt, subV, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCU = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, subU, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, subV, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }
@@ -334,9 +347,9 @@ bool jo_write_jpg(std::ofstream& outJpeg, const void *data, int width, int heigh
                         V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
-                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y, 8, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCU = jo_processDU(outJpeg, bitBuf, bitCnt, U, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = jo_processDU(outJpeg, bitBuf, bitCnt, V, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y, 8, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCU = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, U, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, V, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }
@@ -351,7 +364,15 @@ bool jo_write_jpg(std::ofstream& outJpeg, const void *data, int width, int heigh
 
 int main(int argc, char* argv[])
 {
-    indct.open(argv[1]);
+    std::ifstream inDCTFile;
+    inDCTFile.open(argv[1]);
+
+    if (!inDCTFile.is_open()) {
+        return 1;
+    }
+
+    std::istream_iterator<int> inDCTIter(inDCTFile);
+
     int i;
     char *filename;
     const void *data;
@@ -360,7 +381,7 @@ int main(int argc, char* argv[])
     int comp = atoi(argv[4]);
     int quality = atoi(argv[5]);
 
-    auto buffer = std::vector<unsigned char>(comp* width*height);
+    auto buffer = std::vector<unsigned char>(comp* width * height);
 
     std::ofstream outJpeg;
     outJpeg.open(argv[6], std::ios::out | std::ios::binary);
@@ -369,7 +390,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    jo_write_jpg(outJpeg, buffer.data(), width, height, comp, quality);
+    jo_write_jpg(inDCTIter,outJpeg, buffer.data(), width, height, comp, quality);
 
     std::ofstream outHeaders;
     outHeaders.open("headers.bin", std::ios::out | std::ios::binary);

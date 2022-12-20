@@ -74,35 +74,41 @@
 #include <string>
 #include <vector>
 #include <iterator>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <algorithm>
 
 int main(int argc, char* argv[])
 {
 
     int size;
-    FILE *f;
-    //FILE* fp = fopen(argv[2], "w");
-    if (argc < 4)
-    {
-        printf("Usage: %s <input.jpg> dct_dump.txt dim.txt quality_of_the_image\n", argv[0]);
+    if (argc < 4) {
+        std::cout << "Usage: " << argv[0]
+                  << " <input.jpg> dct_dump.txt dim.txt quality_of_the_image"
+                  << std::endl;
         return 2;
     }
-    f = fopen(argv[1], "rb");
-    if (!f)
-    {
-        printf("Error opening the input file.\n");
-        return 1;
-    }
-    fseek(f, 0, SEEK_END);
-    size = (int) ftell(f);
-    auto buf = std::vector<char>(size);
 
-    fseek(f, 0, SEEK_SET);
-    size = (int)fread(buf.data(), 1, size, f);
-    fclose(f);
+    // open the file:
+    std::ifstream inJpeg(argv[1], std::ios::binary);
+
+    // Stop eating new lines in binary mode!!!
+    inJpeg.unsetf(std::ios::skipws);
+
+    // get its size:
+    std::streampos fileSize;
+
+    inJpeg.seekg(0, std::ios::end);
+    fileSize = inJpeg.tellg();
+    inJpeg.seekg(0, std::ios::beg);
+
+    // reserve capacity
+    std::vector<char> buff;
+    buff.reserve(fileSize);
+
+    // read the data:
+    buff.insert(buff.begin(),
+               std::istream_iterator<char>(inJpeg),
+               std::istream_iterator<char>());
+
 
     std::ofstream outBlocks;
     outBlocks.open(argv[2], std::ios::out | std::ios::trunc);
@@ -111,10 +117,16 @@ int main(int argc, char* argv[])
 
     auto outBlocksIter = std::back_inserter(blocks);
 
-    if (njDecode(outBlocksIter, buf.data(), size)) {
-        printf("Error decoding the input file.\n");
+    if (njDecode(outBlocksIter, buff.data(), buff.size())) {
+        std::cout << "Error decoding the input file." << std::endl;
         return 1;
     }
+
+    auto minBlk = *std::min_element(blocks.begin(), blocks.end());
+    std::cout << minBlk << std::endl;
+
+    auto maxBlk = *std::max_element(blocks.begin(), blocks.end());
+    std::cout << maxBlk << std::endl;
 
     for (auto block: blocks) {
         outBlocks << block << ' ';

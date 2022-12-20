@@ -308,7 +308,7 @@ static inline void njDecodeBlock(OutIterT& outBlocks, nj_component_t* c, unsigne
     std::memset(nj.block, 0, sizeof(nj.block));
     c->dcpred += njGetVLC(&nj.vlctab[c->dctabsel][0], NULL);
 
-    nj.block[0] = (c->dcpred) * 1; //nj.qtab[c->qtsel][0]
+    nj.block[0] = c->dcpred;
 
     do {
         value = njGetVLC(&nj.vlctab[c->actabsel][0], &code);
@@ -319,7 +319,7 @@ static inline void njDecodeBlock(OutIterT& outBlocks, nj_component_t* c, unsigne
 
         if (coef > 63) njThrow(NJ_SYNTAX_ERROR);
 
-        nj.block[(int) njZZ[coef]] = value * 1; //nj.qtab[c->qtsel][coef]
+        nj.block[(int) njZZ[coef]] = value;
     }
     while (coef < 63);
     unsigned int i = 0;

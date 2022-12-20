@@ -104,8 +104,6 @@ int main(int argc, char* argv[])
     size = (int)fread(buf.data(), 1, size, f);
     fclose(f);
 
-    njInit();
-
     std::ofstream outBlocks;
     outBlocks.open(argv[2], std::ios::out | std::ios::trunc);
 
@@ -122,14 +120,13 @@ int main(int argc, char* argv[])
         outBlocks << block << ' ';
     }
 
-    int w = njGetWidth();
-    int h = njGetHeight();
+    int w = nj.getWidth();
+    int h = nj.getHeight();
     std::cout << w << " " << h;
     std::ofstream dim;
     dim.open (argv[3]);
     dim << w << " " << h << " "<< argv[4];
     dim.close();
 
-    njDone();
     return 0;
 }

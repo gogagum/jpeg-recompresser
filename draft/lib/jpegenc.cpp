@@ -37,13 +37,6 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
 
 #ifndef JO_JPEG_HEADER_FILE_ONLY
 
-#if defined(_MSC_VER) && _MSC_VER >= 0x1400
-#define _CRT_SECURE_NO_WARNINGS // suppress warnings about fopen()
-#endif
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -54,21 +47,23 @@ FILE *fp2;
 
 ifstream indct;
 
-static void jo_writeBits(FILE *fp, int &bitBuf, int &bitCnt, const unsigned short *bs) {
+static void jo_writeBits(std::ofstream& outFile, int &bitBuf, int &bitCnt,
+                         const unsigned short *bs) {
     bitCnt += bs[1];
     bitBuf |= bs[0] << (24 - bitCnt);
     while (bitCnt >= 8) {
         unsigned char c = (bitBuf >> 16) & 255;
-        putc(c, fp);
+        outFile.put(c);
         if (c == 255) {
-            putc(0, fp);
+            outFile.put(0);
         }
         bitBuf <<= 8;
         bitCnt -= 8;
     }
 }
 
-static void jo_DCT(float &d0, float &d1, float &d2, float &d3, float &d4, float &d5, float &d6, float &d7) {
+static void jo_DCT(float &d0, float &d1, float &d2, float &d3, float &d4,
+                   float &d5, float &d6, float &d7) {
     float tmp0 = d0 + d7;
     float tmp7 = d0 - d7;
     float tmp1 = d1 + d6;
@@ -121,7 +116,7 @@ static void jo_calcBits(int val, unsigned short bits[2]) {
     bits[0] = val & ((1 << bits[1]) - 1);
 }
 
-static int jo_processDU(FILE *fp, int &bitBuf, int &bitCnt, float *CDU, int du_stride, float *fdtbl, int DC, const unsigned short HTDC[256][2], const unsigned short HTAC[256][2]) {
+static int jo_processDU(std::ofstream& outJpeg, int &bitBuf, int &bitCnt, float *CDU, int du_stride, float *fdtbl, int DC, const unsigned short HTDC[256][2], const unsigned short HTAC[256][2]) {
     const unsigned short EOB[2] = { HTAC[0x00][0], HTAC[0x00][1] };
     const unsigned short M16zeroes[2] = { HTAC[0xF0][0], HTAC[0xF0][1] };
 
@@ -155,13 +150,13 @@ static int jo_processDU(FILE *fp, int &bitBuf, int &bitCnt, float *CDU, int du_s
     // Encode DC
     int diff = DU[0] - DC;
     if (diff == 0) {
-        jo_writeBits(fp, bitBuf, bitCnt, HTDC[0]);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, HTDC[0]);
     }
     else {
         unsigned short bits[2];
         jo_calcBits(diff, bits);
-        jo_writeBits(fp, bitBuf, bitCnt, HTDC[bits[1]]);
-        jo_writeBits(fp, bitBuf, bitCnt, bits);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, HTDC[bits[1]]);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, bits);
     }
     // Encode ACs
     int end0pos = 63;
@@ -169,7 +164,7 @@ static int jo_processDU(FILE *fp, int &bitBuf, int &bitCnt, float *CDU, int du_s
     }
     // end0pos = first element in reverse order !=0
     if (end0pos == 0) {
-        jo_writeBits(fp, bitBuf, bitCnt, EOB);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, EOB);
         return DU[0];
     }
     for (int i = 1; i <= end0pos; ++i) {
@@ -180,22 +175,23 @@ static int jo_processDU(FILE *fp, int &bitBuf, int &bitCnt, float *CDU, int du_s
         if (nrzeroes >= 16) {
             int lng = nrzeroes >> 4;
             for (int nrmarker = 1; nrmarker <= lng; ++nrmarker)
-                jo_writeBits(fp, bitBuf, bitCnt, M16zeroes);
+                jo_writeBits(outJpeg, bitBuf, bitCnt, M16zeroes);
             nrzeroes &= 15;
         }
         unsigned short bits[2];
         jo_calcBits(DU[i], bits);
-        jo_writeBits(fp, bitBuf, bitCnt, HTAC[(nrzeroes << 4) + bits[1]]);
-        jo_writeBits(fp, bitBuf, bitCnt, bits);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, HTAC[(nrzeroes << 4) + bits[1]]);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, bits);
     }
     if (end0pos != 63) {
-        jo_writeBits(fp, bitBuf, bitCnt, EOB);
+        jo_writeBits(outJpeg, bitBuf, bitCnt, EOB);
     }
     return DU[0];
 }
 
-bool jo_write_headers(FILE*& fp, int width, int height, int comp, int quality) {
-    if (!fp || !width || !height || comp > 4 || comp < 1 || comp == 2) {
+bool jo_write_headers(std::ofstream& outBinary, int width, int height,
+                      int comp, int quality) {
+    if (!width || !height || comp > 4 || comp < 1 || comp == 2) {
         return false;
     }
 
@@ -223,14 +219,15 @@ bool jo_write_headers(FILE*& fp, int width, int height, int comp, int quality) {
     }
 
     const auto writeArr =
-        [fp](const auto& arr, std::size_t startOffset = 0) {
-            fwrite(arr.data() + startOffset, arr.size() - startOffset, 1, fp);
+        [&outBinary](const auto& arr, std::size_t startOffset = 0) {
+            outBinary.write(reinterpret_cast<const char*>(arr.data() + startOffset),
+                            arr.size() - startOffset);
         };
 
     // Write Headers
     writeArr(tbl::head0);
     writeArr(YTable);
-    putc(1, fp);
+    outBinary.put(1);
     writeArr(UVTable);
     unsigned char h0 = height >> 8;
     unsigned char h1 = height & 0xFF;
@@ -244,30 +241,25 @@ bool jo_write_headers(FILE*& fp, int width, int height, int comp, int quality) {
     writeArr(head1);
     writeArr(tbl::std_dc_luminance_nrcodes, 1);
     writeArr(tbl::std_dc_luminance_values);
-    putc(0x10, fp); // HTYACinfo
+    outBinary.put(0x10); // HTYACinfo
     writeArr(tbl::std_ac_luminance_nrcodes, 1);
     writeArr(tbl::std_ac_luminance_values);
-    putc(1, fp); // HTUDCinfo
+    outBinary.put(1); // HTUDCinfo
     writeArr(tbl::std_dc_chrominance_nrcodes, 1);
     writeArr(tbl::std_dc_chrominance_values);
-    putc(0x11, fp); // HTUACinfo
+    outBinary.put(0x11); // HTUACinfo
     writeArr(tbl::std_ac_chrominance_nrcodes, 1);
     writeArr(tbl::std_ac_chrominance_values);
     writeArr(tbl::head2);
     return true;
 }
 
-bool jo_write_jpg(const char *filename, const void *data, int width, int height, int comp, int quality) {
-    if (!data || !filename || !width || !height || comp > 4 || comp < 1 || comp == 2) {
+bool jo_write_jpg(std::ofstream& outJpeg, const void *data, int width, int height, int comp, int quality) {
+    if (!data || !width || !height || comp > 4 || comp < 1 || comp == 2) {
         return false;
     }
 
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) {
-        return false;
-    }
-
-    if (!jo_write_headers(fp, width, height, comp, quality)) {
+    if (!jo_write_headers(outJpeg, width, height, comp, quality)) {
         return false;
     }
 
@@ -314,10 +306,10 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
                         V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
-                DCY = jo_processDU(fp, bitBuf, bitCnt, Y + 0, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(fp, bitBuf, bitCnt, Y + 8, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(fp, bitBuf, bitCnt, Y + 128, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(fp, bitBuf, bitCnt, Y + 136, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y + 0, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y + 8, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y + 128, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y + 136, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
                 // subsample U,V
                 float subU[64], subV[64];
                 for (int yy = 0, pos = 0; yy < 8; ++yy) {
@@ -327,8 +319,8 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
                         subV[pos] = (V[j + 0] + V[j + 1] + V[j + 16] + V[j + 17]) * 0.25f;
                     }
                 }
-                DCU = jo_processDU(fp, bitBuf, bitCnt, subU, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = jo_processDU(fp, bitBuf, bitCnt, subV, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCU = jo_processDU(outJpeg, bitBuf, bitCnt, subU, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = jo_processDU(outJpeg, bitBuf, bitCnt, subV, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }
@@ -347,26 +339,24 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
                         V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
-                DCY = jo_processDU(fp, bitBuf, bitCnt, Y, 8, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCU = jo_processDU(fp, bitBuf, bitCnt, U, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = jo_processDU(fp, bitBuf, bitCnt, V, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCY = jo_processDU(outJpeg, bitBuf, bitCnt, Y, 8, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCU = jo_processDU(outJpeg, bitBuf, bitCnt, U, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = jo_processDU(outJpeg, bitBuf, bitCnt, V, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }
 
     // Do the bit alignment of the EOI marker
     static const unsigned short fillBits[] = { 0x7F, 7 };
-    jo_writeBits(fp, bitBuf, bitCnt, fillBits);
-    putc(0xFF, fp);
-    putc(0xD9, fp);
-    fclose(fp);
+    jo_writeBits(outJpeg, bitBuf, bitCnt, fillBits);
+    outJpeg.put(0xFF);
+    outJpeg.put(0xD9);
     return true;
 }
 
 int main(int argc, char* argv[])
 {
     indct.open(argv[1]);
-    FILE *fp;
     int i;
     char *filename;
     const void *data;
@@ -377,15 +367,23 @@ int main(int argc, char* argv[])
 
     auto buffer = std::vector<unsigned char>(comp* width*height);
 
-    jo_write_jpg(argv[6], buffer.data(), width, height, comp, quality);
+    std::ofstream outJpeg;
+    outJpeg.open(argv[6], std::ios::out | std::ios::binary);
 
-    FILE* headersF = fopen("headers.bin", "wb");;
-    if (!fp) {
+    if (!outJpeg.is_open()) {
         return 1;
     }
 
-    jo_write_headers(headersF, width, height, comp, quality);
-    fclose(headersF);
+    jo_write_jpg(outJpeg, buffer.data(), width, height, comp, quality);
+
+    std::ofstream outHeaders;
+    outHeaders.open("headers.bin", std::ios::out | std::ios::binary);
+
+    if (!outHeaders.is_open()) {
+        return 1;
+    }
+
+    jo_write_headers(outHeaders, width, height, comp, quality);
 }
 
 

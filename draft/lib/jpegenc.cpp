@@ -42,10 +42,9 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
 #include <fstream>
 #include "enc/tables.hpp"
 
-using namespace std;
 FILE *fp2;
 
-ifstream indct;
+std::ifstream indct;
 
 static void jo_writeBits(std::ofstream& outFile, int &bitBuf, int &bitCnt,
                          const unsigned short *bs) {
@@ -136,16 +135,12 @@ static int jo_processDU(std::ofstream& outJpeg, int &bitBuf, int &bitCnt, float 
             int n;
             indct >> n;
 
-            cout << " " << n;
+            std::cout << " " << n;
             DU[tbl::s_jo_ZigZag[j]] =n;// (int)(v < 0 ? ceilf(v - 0.5f) : floorf(v + 0.5f));
         }
     }
-    cout << "\n";
+    std::cout << "\n";
     int n;
-    for (int j=0; j <64; j++){
-        //cout << DU[j] << " ";
-    }
-    //cout << "\n";
 
     // Encode DC
     int diff = DU[0] - DC;

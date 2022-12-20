@@ -279,14 +279,6 @@ int main(int argc, char* argv[])
 
 #ifndef _NJ_INCLUDE_HEADER_ONLY
 
-#ifdef _MSC_VER
-    #define NJ_INLINE static __inline
-    #define NJ_FORCE_INLINE static __forceinline
-#else
-    #define NJ_INLINE static inline
-    #define NJ_FORCE_INLINE static inline
-#endif
-
 #if NJ_USE_LIBC
     #include <stdlib.h>
     #include <string.h>
@@ -300,13 +292,13 @@ int main(int argc, char* argv[])
     #include <windows.h>
     #define njAllocMem(size) ((void*) LocalAlloc(LMEM_FIXED, (SIZE_T)(size)))
     #define njFreeMem(block) ((void) LocalFree((HLOCAL) block))
-    NJ_INLINE void njFillMem(void* block, unsigned char value, int count) { __asm {
+    static inline void njFillMem(void* block, unsigned char value, int count) { __asm {
         mov edi, block
         mov al, value
         mov ecx, count
         rep stosb
     } }
-    NJ_INLINE void njCopyMem(void* dest, const void* src, int count) { __asm {
+    static inline void njCopyMem(void* dest, const void* src, int count) { __asm {
         mov edi, dest
         mov esi, src
         mov ecx, count
@@ -360,7 +352,7 @@ static const char njZZ[64] = { 0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18,
 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59, 52, 45,
 38, 31, 39, 46, 53, 60, 61, 54, 47, 55, 62, 63 };
 
-NJ_FORCE_INLINE unsigned char njClip(const int x) {
+static inline unsigned char njClip(const int x) {
     return (x < 0) ? 0 : ((x > 0xFF) ? 0xFF : (unsigned char) x);
 }
 
@@ -371,7 +363,7 @@ NJ_FORCE_INLINE unsigned char njClip(const int x) {
 #define W6 1108
 #define W7 565
 
-NJ_INLINE void njRowIDCT(int* blk) {
+static inline void njRowIDCT(int* blk) {
     int x0, x1, x2, x3, x4, x5, x6, x7, x8;
     if (!((x1 = blk[4] << 11)
         | (x2 = blk[6])
@@ -416,7 +408,7 @@ NJ_INLINE void njRowIDCT(int* blk) {
     blk[7] = (x7 - x1) >> 8;
 }
 
-NJ_INLINE void njColIDCT(const int* blk, unsigned char *out, int stride)
+static inline void njColIDCT(const int* blk, unsigned char *out, int stride)
 {
     int x0, x1, x2, x3, x4, x5, x6, x7, x8;
     if (!((x1 = blk[8*4] << 8)
@@ -507,19 +499,19 @@ static int njShowBits(int bits) {
     return (nj.buf >> (nj.bufbits - bits)) & ((1 << bits) - 1);
 }
 
-NJ_INLINE void njSkipBits(int bits) {
+static inline void njSkipBits(int bits) {
     if (nj.bufbits < bits)
         (void) njShowBits(bits);
     nj.bufbits -= bits;
 }
 
-NJ_INLINE int njGetBits(int bits) {
+static inline int njGetBits(int bits) {
     int res = njShowBits(bits);
     njSkipBits(bits);
     return res;
 }
 
-NJ_INLINE void njByteAlign(void) {
+static inline void njByteAlign(void) {
     nj.bufbits &= 0xF8;
 }
 
@@ -530,7 +522,7 @@ static void njSkip(int count) {
     if (nj.size < 0) nj.error = NJ_SYNTAX_ERROR;
 }
 
-NJ_INLINE unsigned short njDecode16(const unsigned char *pos) {
+static inline unsigned short njDecode16(const unsigned char *pos) {
     return (pos[0] << 8) | pos[1];
 }
 
@@ -541,12 +533,12 @@ static void njDecodeLength(void) {
     njSkip(2);
 }
 
-NJ_INLINE void njSkipMarker(void) {
+static inline void njSkipMarker(void) {
     njDecodeLength();
     njSkip(nj.length);
 }
 
-NJ_INLINE void njDecodeSOF(void) {
+static inline void njDecodeSOF(void) {
     int i, ssxmax = 0, ssymax = 0;
     nj_component_t* c;
     njDecodeLength();
@@ -600,7 +592,7 @@ NJ_INLINE void njDecodeSOF(void) {
     njSkip(nj.length);
 }
 
-NJ_INLINE void njDecodeDHT(void) {
+static inline void njDecodeDHT(void) {
     int codelen, currcnt, remain, spread, i, j;
     nj_vlc_code_t *vlc;
     static unsigned char counts[16];
@@ -641,7 +633,7 @@ NJ_INLINE void njDecodeDHT(void) {
     if (nj.length) njThrow(NJ_SYNTAX_ERROR);
 }
 
-NJ_INLINE void njDecodeDQT(void) {
+static inline void njDecodeDQT(void) {
     int i;
     unsigned char *t;
     njDecodeLength();
@@ -658,7 +650,7 @@ NJ_INLINE void njDecodeDQT(void) {
     if (nj.length) njThrow(NJ_SYNTAX_ERROR);
 }
 
-NJ_INLINE void njDecodeDRI(void) {
+static inline void njDecodeDRI(void) {
     njDecodeLength();
     njCheckError();
     if (nj.length < 2) njThrow(NJ_SYNTAX_ERROR);
@@ -681,7 +673,7 @@ static int njGetVLC(nj_vlc_code_t* vlc, unsigned char* code) {
     return value;
 }
 
-NJ_INLINE void njDecodeBlock(nj_component_t* c, unsigned char* out)
+static inline void njDecodeBlock(nj_component_t* c, unsigned char* out)
 {
     unsigned char code = 0;
     int value, coef = 0;
@@ -742,7 +734,7 @@ NJ_INLINE void njDecodeBlock(nj_component_t* c, unsigned char* out)
 
 }
 
-NJ_INLINE void njDecodeScan(void) {
+static inline void njDecodeScan(void) {
     int i, mbx, mby, sbx, sby;
     int rstcount = nj.rstinterval, nextrst = 0;
     nj_component_t* c;
@@ -800,7 +792,7 @@ NJ_INLINE void njDecodeScan(void) {
 #define CF2B (-11)
 #define CF(x) njClip(((x) + 64) >> 7)
 
-NJ_INLINE void njUpsampleH(nj_component_t* c) {
+static inline void njUpsampleH(nj_component_t* c) {
     const int xmax = c->width - 3;
     unsigned char *out, *lin, *lout;
     int x, y;
@@ -828,7 +820,7 @@ NJ_INLINE void njUpsampleH(nj_component_t* c) {
     c->pixels = out;
 }
 
-NJ_INLINE void njUpsampleV(nj_component_t* c) {
+static inline void njUpsampleV(nj_component_t* c) {
     const int w = c->width, s1 = c->stride, s2 = s1 + s1;
     unsigned char *out, *cin, *cout;
     int x, y;
@@ -859,7 +851,7 @@ NJ_INLINE void njUpsampleV(nj_component_t* c) {
 
 #else
 
-NJ_INLINE void njUpsample(nj_component_t* c) {
+static inline void njUpsample(nj_component_t* c) {
     int x, y, xshift = 0, yshift = 0;
     unsigned char *out, *lin, *lout;
     while (c->width < nj.width) { c->width <<= 1; ++xshift; }
@@ -881,7 +873,7 @@ NJ_INLINE void njUpsample(nj_component_t* c) {
 
 #endif
 
-NJ_INLINE void njConvert(void) {
+static inline void njConvert(void) {
     int i;
     nj_component_t* c;
     for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {

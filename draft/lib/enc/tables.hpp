@@ -19,15 +19,16 @@ static const int YQT[] = {
     49, 64,  78,  87, 103, 121, 120, 101, 72, 92, 95, 98, 112, 100, 103, 99
 };
 
-static const unsigned char std_dc_luminance_nrcodes[] = {
-    0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0};
-static const unsigned char std_dc_luminance_values[] = {
+const auto std_dc_luminance_nrcodes = std::array<unsigned char, 17> {
+    0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0
+};
+const auto std_dc_luminance_values = std::array<unsigned char, 12> {
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 };
-static const unsigned char std_ac_luminance_nrcodes[] = {
+const auto std_ac_luminance_nrcodes = std::array<unsigned char, 17>{
     0, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d
 };
-static const unsigned char std_ac_luminance_values[] = {
+const auto std_ac_luminance_values = std::array<unsigned char, 162> {
     0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12, 0x21, 0x31, 0x41, 0x06,
     0x13, 0x51, 0x61, 0x07, 0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xa1, 0x08,
     0x23, 0x42, 0xb1, 0xc1, 0x15, 0x52, 0xd1, 0xf0, 0x24, 0x33, 0x62, 0x72,
@@ -43,16 +44,16 @@ static const unsigned char std_ac_luminance_values[] = {
     0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xf1, 0xf2, 0xf3, 0xf4,
     0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa
 };
-static const unsigned char std_dc_chrominance_nrcodes[] = {
+const auto std_dc_chrominance_nrcodes = std::array<unsigned char, 17>{
     0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0
 };
 const auto std_dc_chrominance_values = std::array<unsigned char, 12> {
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 };
-static const unsigned char std_ac_chrominance_nrcodes[] = {
+const auto std_ac_chrominance_nrcodes = std::array<unsigned char, 17> {
     0, 0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 0x77
 };
-static const unsigned char std_ac_chrominance_values[] = {
+const auto std_ac_chrominance_values = std::array<unsigned char, 162> {
     0x00, 0x01, 0x02, 0x03, 0x11, 0x04, 0x05, 0x21, 0x31, 0x06, 0x12, 0x41,
     0x51, 0x07, 0x61, 0x71, 0x13, 0x22, 0x32, 0x81, 0x08, 0x14, 0x42, 0x91,
     0xa1, 0xb1, 0xc1, 0x09, 0x23, 0x33, 0x52, 0xf0, 0x15, 0x62, 0x72, 0xd1,
@@ -237,6 +238,15 @@ static const float aasf[] = {
     1.306562965f * 2.828427125f, 1.175875602f * 2.828427125f,
     1.0f * 2.828427125f,         0.785694958f * 2.828427125f,
     0.541196100f * 2.828427125f, 0.275899379f * 2.828427125f
+};
+
+const auto head0 = std::array<unsigned char, 25>{
+    0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, 'J', 'F', 'I', 'F', 0, 1, 1, 0, 0, 1, 0, 1,
+    0, 0, 0xFF, 0xDB, 0, 0x84, 0
+};
+
+const auto head2 = std::array<unsigned char, 14>{
+    0xFF, 0xDA, 0, 0xC, 3, 1, 0, 2, 0x11, 3, 0x11, 0, 0x3F, 0
 };
 
 }

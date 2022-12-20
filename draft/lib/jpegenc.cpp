@@ -45,6 +45,7 @@ extern bool jo_write_jpg(const char *filename, const void *data, int width, int 
 #include <stdlib.h>
 #include <math.h>
 #include <iostream>
+#include <vector>
 #include <fstream>
 #include "enc/tables.hpp"
 
@@ -137,23 +138,15 @@ static int jo_processDU(FILE *fp, int &bitBuf, int &bitCnt, float *CDU, int du_s
     int DU[64];
     for (int y = 0, j = 0; y < 8; ++y) {
         for (int x = 0; x < 8; ++x, ++j) {
-            int i = y * du_stride + x;
-            float v = CDU[i] * fdtbl[j];
             int n;
             indct >> n;
 
             cout << " " << n;
             DU[tbl::s_jo_ZigZag[j]] =n;// (int)(v < 0 ? ceilf(v - 0.5f) : floorf(v + 0.5f));
         }
-        //cout << "\n";
     }
     cout << "\n";
     int n;
-    for (int j=0; j<64; j++){
-      //  indct >> n;
-        //cout << n << " ";
-      //  DU[j] = n;
-    }
     for (int j=0; j <64; j++){
         //cout << DU[j] << " ";
     }
@@ -394,14 +387,11 @@ int main(int argc, char* argv[])
     int height = atoi(argv[3]);
     int comp = atoi(argv[4]);
     int quality = atoi(argv[5]);
-    unsigned char *buffer;
 
-    buffer = (unsigned char*)malloc(comp* width*height*sizeof(unsigned char));
+    auto buffer = std::vector<unsigned char>(comp* width*height);
 
-    jo_write_jpg(argv[6], buffer, width, height, comp, quality);
-    jo_write_headers("headers.bin", buffer, width, height, comp, quality);
-    free(buffer);
-
+    jo_write_jpg(argv[6], buffer.data(), width, height, comp, quality);
+    jo_write_headers("headers.bin", buffer.data(), width, height, comp, quality);
 }
 
 

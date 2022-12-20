@@ -1,6 +1,8 @@
 #ifndef TABLES_HPP
 #define TABLES_HPP
 
+#include <array>
+
 namespace tbl{
 
 static const unsigned char s_jo_ZigZag[] = {
@@ -44,7 +46,7 @@ static const unsigned char std_ac_luminance_values[] = {
 static const unsigned char std_dc_chrominance_nrcodes[] = {
     0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0
 };
-static const unsigned char std_dc_chrominance_values[] = {
+const auto std_dc_chrominance_values = std::array<unsigned char, 12> {
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 };
 static const unsigned char std_ac_chrominance_nrcodes[] = {

@@ -194,13 +194,8 @@ static int jo_processDU(FILE *fp, int &bitBuf, int &bitCnt, float *CDU, int du_s
     return DU[0];
 }
 
-bool jo_write_headers(const char *filename, const void *data, int width, int height, int comp, int quality) {
-    if (!data || !filename || !width || !height || comp > 4 || comp < 1 || comp == 2) {
-        return false;
-    }
-
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) {
+bool jo_write_headers(FILE*& fp, int width, int height, int comp, int quality) {
+    if (!fp || !width || !height || comp > 4 || comp < 1 || comp == 2) {
         return false;
     }
 
@@ -244,7 +239,7 @@ bool jo_write_headers(const char *filename, const void *data, int width, int hei
     fwrite(tbl::std_ac_luminance_values, sizeof(tbl::std_ac_luminance_values), 1, fp);
     putc(1, fp); // HTUDCinfo
     fwrite(tbl::std_dc_chrominance_nrcodes + 1, sizeof(tbl::std_dc_chrominance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_dc_chrominance_values, sizeof(tbl::std_dc_chrominance_values), 1, fp);
+    fwrite(tbl::std_dc_chrominance_values.data(), tbl::std_dc_chrominance_values.size(), 1, fp);
     putc(0x11, fp); // HTUACinfo
     fwrite(tbl::std_ac_chrominance_nrcodes + 1, sizeof(tbl::std_ac_chrominance_nrcodes) - 1, 1, fp);
     fwrite(tbl::std_ac_chrominance_values, sizeof(tbl::std_ac_chrominance_values), 1, fp);
@@ -252,6 +247,7 @@ bool jo_write_headers(const char *filename, const void *data, int width, int hei
     fwrite(head2, sizeof(head2), 1, fp);
     return true;
 }
+
 bool jo_write_jpg(const char *filename, const void *data, int width, int height, int comp, int quality) {
     if (!data || !filename || !width || !height || comp > 4 || comp < 1 || comp == 2) {
         return false;
@@ -259,6 +255,10 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
 
     FILE *fp = fopen(filename, "wb");
     if (!fp) {
+        return false;
+    }
+
+    if (!jo_write_headers(fp, width, height, comp, quality)) {
         return false;
     }
 
@@ -283,27 +283,6 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
         }
     }
 
-    // Write Headers
-    static const unsigned char head0[] = { 0xFF,0xD8,  0xFF,0xE0,0,0x10,'J','F','I','F',0,1,1,0,0,1,0,1,0,0,0xFF,  0xDB,0,0x84,0 };
-    fwrite(head0, sizeof(head0), 1, fp);
-    fwrite(YTable, sizeof(YTable), 1, fp);
-    putc(1, fp);
-    fwrite(UVTable, sizeof(UVTable), 1, fp);
-    const unsigned char head1[] = { 0xFF,0xC0,0,0x11,8,(unsigned char)(height >> 8),(unsigned char)(height & 0xFF),(unsigned char)(width >> 8),(unsigned char)(width & 0xFF),3,1,(unsigned char)(subsample ? 0x22 : 0x11),0,2,0x11,1,3,0x11,1,0xFF,0xC4,0x01,0xA2,0 };
-    fwrite(head1, sizeof(head1), 1, fp);
-    fwrite(tbl::std_dc_luminance_nrcodes + 1, sizeof(tbl::std_dc_luminance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_dc_luminance_values, sizeof(tbl::std_dc_luminance_values), 1, fp);
-    putc(0x10, fp); // HTYACinfo
-    fwrite(tbl::std_ac_luminance_nrcodes + 1, sizeof(tbl::std_ac_luminance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_ac_luminance_values, sizeof(tbl::std_ac_luminance_values), 1, fp);
-    putc(1, fp); // HTUDCinfo
-    fwrite(tbl::std_dc_chrominance_nrcodes + 1, sizeof(tbl::std_dc_chrominance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_dc_chrominance_values, sizeof(tbl::std_dc_chrominance_values), 1, fp);
-    putc(0x11, fp); // HTUACinfo
-    fwrite(tbl::std_ac_chrominance_nrcodes + 1, sizeof(tbl::std_ac_chrominance_nrcodes) - 1, 1, fp);
-    fwrite(tbl::std_ac_chrominance_values, sizeof(tbl::std_ac_chrominance_values), 1, fp);
-    static const unsigned char head2[] = { 0xFF,0xDA,0,0xC,3,1,0,2,0x11,3,0x11,0,0x3F,0 };
-    fwrite(head2, sizeof(head2), 1, fp);
 
     // Encode 8x8 macroblocks
     int ofsG = comp > 1 ? 1 : 0, ofsB = comp > 1 ? 2 : 0;
@@ -391,7 +370,14 @@ int main(int argc, char* argv[])
     auto buffer = std::vector<unsigned char>(comp* width*height);
 
     jo_write_jpg(argv[6], buffer.data(), width, height, comp, quality);
-    jo_write_headers("headers.bin", buffer.data(), width, height, comp, quality);
+
+    FILE* headersF = fopen("headers.bin", "wb");;
+    if (!fp) {
+        return 1;
+    }
+
+    jo_write_headers(headersF, width, height, comp, quality);
+    fclose(headersF);
 }
 
 

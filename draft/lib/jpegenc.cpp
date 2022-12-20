@@ -118,7 +118,7 @@ static void jo_calcBits(int val, unsigned short bits[2]) {
 }
 
 template <std::input_iterator IteratorT>
-static int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
+int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
                         int &bitBuf, int &bitCnt, float *CDU, int du_stride,
                         float *fdtbl, int DC,
                         const unsigned short HTDC[256][2],
@@ -299,6 +299,10 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
     const unsigned char *dataB = dataR + ofsB;
     int DCY = 0, DCU = 0, DCV = 0;
     int bitBuf = 0, bitCnt = 0;
+    const auto processDU = [&inDCT, &outJpeg, &bitBuf, &bitCnt](auto&&... tailArgs) {
+        return jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, tailArgs...);
+    };
+
     if (subsample) {
         for (int y = 0; y < height; y += 16) {
             for (int x = 0; x < width; x += 16) {
@@ -314,10 +318,10 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
                         V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
-                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y + 0, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y + 8, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y + 128, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y + 136, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = processDU(Y + 0, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = processDU(Y + 8, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = processDU(Y + 128, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = processDU(Y + 136, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
                 // subsample U,V
                 float subU[64], subV[64];
                 for (int yy = 0, pos = 0; yy < 8; ++yy) {
@@ -327,8 +331,8 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
                         subV[pos] = (V[j + 0] + V[j + 1] + V[j + 16] + V[j + 17]) * 0.25f;
                     }
                 }
-                DCU = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, subU, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, subV, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCU = processDU(subU, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = processDU(subV, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }
@@ -347,9 +351,9 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
                         V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
-                DCY = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, Y, 8, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCU = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, U, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, V, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCY = processDU(Y, 8, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCU = processDU(U, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = processDU(V, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }

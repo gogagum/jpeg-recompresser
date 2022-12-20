@@ -153,16 +153,20 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
     std::cout << "\n";
     int n;
 
+    const auto writeJpegBits = [&outJpeg, &bitBuf, &bitCnt](auto bits) {
+        jo_writeBits(outJpeg, bitBuf, bitCnt, bits);
+    };
+
     // Encode DC
     int diff = DU[0] - DC;
     if (diff == 0) {
-        jo_writeBits(outJpeg, bitBuf, bitCnt, HTDC[0]);
+        writeJpegBits(HTDC[0]);
     }
     else {
         unsigned short bits[2];
         jo_calcBits(diff, bits);
-        jo_writeBits(outJpeg, bitBuf, bitCnt, HTDC[bits[1]]);
-        jo_writeBits(outJpeg, bitBuf, bitCnt, bits);
+        writeJpegBits(HTDC[bits[1]]);
+        writeJpegBits(bits);
     }
     // Encode ACs
     int end0pos = 63;
@@ -180,19 +184,46 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
         int nrzeroes = i - startpos;
         if (nrzeroes >= 16) {
             int lng = nrzeroes >> 4;
-            for (int nrmarker = 1; nrmarker <= lng; ++nrmarker)
-                jo_writeBits(outJpeg, bitBuf, bitCnt, M16zeroes);
+            for (int nrmarker = 1; nrmarker <= lng; ++nrmarker) {
+                writeJpegBits(M16zeroes);
+            }
             nrzeroes &= 15;
         }
         unsigned short bits[2];
         jo_calcBits(DU[i], bits);
-        jo_writeBits(outJpeg, bitBuf, bitCnt, HTAC[(nrzeroes << 4) + bits[1]]);
-        jo_writeBits(outJpeg, bitBuf, bitCnt, bits);
+        writeJpegBits(HTAC[(nrzeroes << 4) + bits[1]]);
+        writeJpegBits(bits);
     }
     if (end0pos != 63) {
-        jo_writeBits(outJpeg, bitBuf, bitCnt, EOB);
+        writeJpegBits(EOB);
     }
     return DU[0];
+}
+
+
+struct QualityEstimation {
+    int quality;
+    bool subsample;
+};
+
+QualityEstimation estimQuality(int quality) {
+    quality = quality ? quality : 90;
+    bool subsample = quality <= 90 ? 1 : 0;
+    quality = quality < 1 ? 1 : quality > 100 ? 100 : quality;
+    quality = quality < 50 ? 5000 / quality : 200 - quality * 2;
+    return { quality, subsample };
+}
+
+std::array<unsigned char, 24> calcHead1(int width, int height, bool subsample) {
+    unsigned char h0 = height >> 8;
+    unsigned char h1 = height & 0xFF;
+    unsigned char w0 = width >> 8;
+    unsigned char w1 = width & 0xFF;
+    return std::array<unsigned char, 24>{
+        0xFF, 0xC0, 0, 0x11, 8, h0, h1, w0, w1, 3, 1,
+        (unsigned char) (subsample ? 0x22 : 0x11), 0,
+        2, 0x11, 1, 3, 0x11, 1, 0xFF, 0xC4, 0x01, 0xA2, 0
+    };
 }
 
 bool jo_write_headers(std::ofstream& outBinary, int width, int height,
@@ -201,18 +232,15 @@ bool jo_write_headers(std::ofstream& outBinary, int width, int height,
         return false;
     }
 
-    quality = quality ? quality : 90;
-    int subsample = quality <= 90 ? 1 : 0;
-    quality = quality < 1 ? 1 : quality > 100 ? 100 : quality;
-    quality = quality < 50 ? 5000 / quality : 200 - quality * 2;
+    const auto [actualQuality, subsample] = estimQuality(quality);
 
     auto YTable = std::array<unsigned char, 64>();
     auto UVTable = std::array<unsigned char, 64>();
 
     for (int i = 0; i < 64; ++i) {
-        int yti = (tbl::YQT[i] * quality + 50) / 100;
+        int yti = (tbl::YQT[i] * actualQuality + 50) / 100;
         YTable[tbl::s_jo_ZigZag[i]] = yti < 1 ? 1 : yti > 255 ? 255 : yti;
-        int uvti = (tbl::UVQT[i] * quality + 50) / 100;
+        int uvti = (tbl::UVQT[i] * actualQuality + 50) / 100;
         UVTable[tbl::s_jo_ZigZag[i]] = uvti < 1 ? 1 : uvti > 255 ? 255 : uvti;
     }
 
@@ -235,16 +263,7 @@ bool jo_write_headers(std::ofstream& outBinary, int width, int height,
     writeArr(YTable);
     outBinary.put(1);
     writeArr(UVTable);
-    unsigned char h0 = height >> 8;
-    unsigned char h1 = height & 0xFF;
-    unsigned char w0 = width >> 8;
-    unsigned char w1 = width & 0xFF;
-    const auto head1 = std::array<unsigned char, 24>{
-        0xFF, 0xC0, 0, 0x11, 8, h0, h1, w0, w1, 3, 1,
-        (unsigned char) (subsample ? 0x22 : 0x11), 0,
-        2, 0x11, 1, 3, 0x11, 1, 0xFF, 0xC4, 0x01, 0xA2, 0
-    };
-    writeArr(head1);
+    writeArr(calcHead1(width, height, subsample));
     writeArr(tbl::std_dc_luminance_nrcodes, 1);
     writeArr(tbl::std_dc_luminance_values);
     outBinary.put(0x10); // HTYACinfo
@@ -261,9 +280,9 @@ bool jo_write_headers(std::ofstream& outBinary, int width, int height,
 }
 
 template <std::input_iterator IteratorT>
-bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
+bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
                   int width, int height, int comp, int quality) {
-    if (!data || !width || !height || comp > 4 || comp < 1 || comp == 2) {
+    if (!width || !height || comp > 4 || comp < 1 || comp == 2) {
         return false;
     }
 
@@ -271,16 +290,13 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
         return false;
     }
 
-    quality = quality ? quality : 90;
-    int subsample = quality <= 90 ? 1 : 0;
-    quality = quality < 1 ? 1 : quality > 100 ? 100 : quality;
-    quality = quality < 50 ? 5000 / quality : 200 - quality * 2;
+    const auto [actualQuality, subsample] = estimQuality(quality);
 
     unsigned char YTable[64], UVTable[64];
     for (int i = 0; i < 64; ++i) {
-        int yti = (tbl::YQT[i] * quality + 50) / 100;
+        int yti = (tbl::YQT[i] * actualQuality + 50) / 100;
         YTable[tbl::s_jo_ZigZag[i]] = yti < 1 ? 1 : yti > 255 ? 255 : yti;
-        int uvti = (tbl::UVQT[i] * quality + 50) / 100;
+        int uvti = (tbl::UVQT[i] * actualQuality + 50) / 100;
         UVTable[tbl::s_jo_ZigZag[i]] = uvti < 1 ? 1 : uvti > 255 ? 255 : uvti;
     }
 
@@ -294,9 +310,6 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
 
     // Encode 8x8 macroblocks
     int ofsG = comp > 1 ? 1 : 0, ofsB = comp > 1 ? 2 : 0;
-    const unsigned char *dataR = (const unsigned char *)data;
-    const unsigned char *dataG = dataR + ofsG;
-    const unsigned char *dataB = dataR + ofsB;
     int DCY = 0, DCU = 0, DCV = 0;
     int bitBuf = 0, bitCnt = 0;
     const auto processDU = [&inDCT, &outJpeg, &bitBuf, &bitCnt](auto&&... tailArgs) {
@@ -312,10 +325,6 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
                         int prow = row >= height ? height - 1 : row;
                         int pcol = col >= width ? width - 1 : col;
                         int p = prow * width*comp + pcol * comp;
-                        float r = dataR[p], g = dataG[p], b = dataB[p];
-                        Y[pos] = +0.29900f*r + 0.58700f*g + 0.11400f*b - 128;
-                        U[pos] = -0.16874f*r - 0.33126f*g + 0.50000f*b;
-                        V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
                 DCY = processDU(Y + 0, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
@@ -345,10 +354,6 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg, const void *data,
                         int prow = row >= height ? height - 1 : row;
                         int pcol = col >= width ? width - 1 : col;
                         int p = prow * width*comp + pcol * comp;
-                        float r = dataR[p], g = dataG[p], b = dataB[p];
-                        Y[pos] = +0.29900f*r + 0.58700f*g + 0.11400f*b - 128;
-                        U[pos] = -0.16874f*r - 0.33126f*g + 0.50000f*b;
-                        V[pos] = +0.50000f*r - 0.41869f*g - 0.08131f*b;
                     }
                 }
                 DCY = processDU(Y, 8, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
@@ -377,15 +382,10 @@ int main(int argc, char* argv[])
 
     std::istream_iterator<int> inDCTIter(inDCTFile);
 
-    int i;
-    char *filename;
-    const void *data;
     int width = atoi(argv[2]);
     int height = atoi(argv[3]);
     int comp = atoi(argv[4]);
     int quality = atoi(argv[5]);
-
-    auto buffer = std::vector<unsigned char>(comp* width * height);
 
     std::ofstream outJpeg;
     outJpeg.open(argv[6], std::ios::out | std::ios::binary);
@@ -394,7 +394,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    jo_write_jpg(inDCTIter,outJpeg, buffer.data(), width, height, comp, quality);
+    jo_write_jpg(inDCTIter, outJpeg, width, height, comp, quality);
 
     std::ofstream outHeaders;
     outHeaders.open("headers.bin", std::ios::out | std::ios::binary);

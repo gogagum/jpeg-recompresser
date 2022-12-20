@@ -73,6 +73,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <iterator>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,7 +84,7 @@ int main(int argc, char* argv[])
 
     int size;
     FILE *f;
-    FILE* fp = fopen(argv[2], "w");
+    //FILE* fp = fopen(argv[2], "w");
     if (argc < 4)
     {
         printf("Usage: %s <input.jpg> dct_dump.txt dim.txt quality_of_the_image\n", argv[0]);
@@ -100,14 +101,27 @@ int main(int argc, char* argv[])
     auto buf = std::vector<char>(size);
 
     fseek(f, 0, SEEK_SET);
-    size = (int) fread(buf.data(), 1, size, f);
+    size = (int)fread(buf.data(), 1, size, f);
     fclose(f);
 
     njInit();
-    if (njDecode(fp, buf.data(), size)) {
+
+    std::ofstream outBlocks;
+    outBlocks.open(argv[2], std::ios::out | std::ios::trunc);
+
+    std::vector<int> blocks;
+
+    auto outBlocksIter = std::back_inserter(blocks);
+
+    if (njDecode(outBlocksIter, buf.data(), size)) {
         printf("Error decoding the input file.\n");
         return 1;
     }
+
+    for (auto block: blocks) {
+        outBlocks << block << ' ';
+    }
+
     int w = njGetWidth();
     int h = njGetHeight();
     std::cout << w << " " << h;

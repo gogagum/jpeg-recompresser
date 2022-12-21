@@ -12,6 +12,19 @@ std::ofstream openOutPutBinFile(std::string& filename);
 
 std::vector<char> readFileBuff(std::ifstream& filename);
 
+template <class T>
+T readT(std::ifstream& stream) {
+    T ret;
+    stream.read(reinterpret_cast<char*>(&ret), sizeof(T));
+    return ret;
+}
+
+template <class T>
+void writeT(std::ofstream& stream, const T& toWrite) {
+    stream.write(reinterpret_cast<const char*>(&toWrite), sizeof(T));
+}
+
+
 }  // namespace jrec::io
 
 #endif // FILE_IO_HPP

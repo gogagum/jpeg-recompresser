@@ -19,6 +19,16 @@ int main(int argc, char* argv[]) {
         auto inCompressed = jrec::io::openInputBinFile(inFileName);
         auto outJpeg = jrec::io::openOutPutBinFile(outFileName);
 
+        int imageQuality;
+        inCompressed.read(&imageQuality, sizeof(int));
+        int width;
+        outCompressed.read(&width, sizeof(int));
+        int height;
+        outCompressed.read(&height, sizeof(int));
+        int ncomp;
+        outCompressed.read(&ncomp, sizeof(int));
+
+
 
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;

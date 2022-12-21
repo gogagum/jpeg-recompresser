@@ -5,6 +5,7 @@
 #include "archiever/include/flow/int_range_word_flow.hpp"
 #include "archiever/include/arithmetic_coder.hpp"
 #include "archiever/include/dictionary/adaptive_dictionary.hpp"
+#include "archiever/include/dictionary/static_dictionary.hpp"
 
 #include "lib/file_io.hpp"
 #include "lib/nj/nanojpeg.h"
@@ -44,7 +45,7 @@ int main(int argc, char* argv[]) {
 
         using Flow = ga::fl::IntegerWordFlow<int, -128, 127>;
         using Word = ga::w::IntegerWord<int, -128, 127>;
-        using Dict = ga::dict::AdaptiveDictionary<Word>;
+        using Dict = ga::dict::StaticDictionary<Word>;
         using Coder = ga::ArithmeticCoder<Flow, Dict>;
 
 

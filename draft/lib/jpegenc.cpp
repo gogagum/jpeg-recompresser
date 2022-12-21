@@ -46,8 +46,6 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
 
 FILE *fp2;
 
-//std::ifstream indct;
-
 static void jo_writeBits(std::ofstream& outFile, int &bitBuf, int &bitCnt,
                          const unsigned short *bs) {
     bitCnt += bs[1];

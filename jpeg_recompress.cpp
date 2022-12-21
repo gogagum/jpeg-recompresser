@@ -43,9 +43,9 @@ int main(int argc, char* argv[]) {
 
         //auto [minBlock, maxBlock] = std::minmax(blocks.begin(), blocks.end());
 
-        using Flow = ga::fl::IntegerWordFlow<int, -128, 127>;
-        using Word = ga::w::IntegerWord<int, -128, 127>;
-        using Dict = ga::dict::StaticDictionary<Word>;
+        using Flow = ga::fl::IntegerWordFlow<int, -128, 1>;
+        using Word = ga::w::IntegerWord<int, -128, 1>;
+        using Dict = ga::dict::AdaptiveDictionary<Word>;
         using Coder = ga::ArithmeticCoder<Flow, Dict>;
 
 

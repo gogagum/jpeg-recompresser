@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
         inBufCut.resize(inBuff.size() - offset);
         std::memcpy(inBufCut.data(), inBuff.data() + offset, inBufCut.size());
 
-        using Word = ga::w::IntegerWord<int, 0, 8>;
+        using Word = ga::w::IntegerWord<int, 0, 7>;
         using Dict = ga::dict::AdaptiveDictionary<Word>;
         using Decoder = ga::ArithmeticDecoder<Word, Dict>;
 

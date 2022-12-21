@@ -49,8 +49,8 @@ int main(int argc, char* argv[]) {
             blk -= minBlock;
         }
 
-        using Flow = ga::fl::IntegerWordFlow<int, 0, 8>;
-        using Word = ga::w::IntegerWord<int, 0, 8>;
+        using Flow = ga::fl::IntegerWordFlow<int, 0, 7>;
+        using Word = ga::w::IntegerWord<int, 0, 7>;
         using Dict = ga::dict::AdaptiveDictionary<Word>;
         using Coder = ga::ArithmeticCoder<Flow, Dict>;
 
@@ -59,7 +59,6 @@ int main(int argc, char* argv[]) {
         jrec::io::writeT(outCompressed, height);
         jrec::io::writeT(outCompressed, ncomp);
         jrec::io::writeT(outCompressed, minBlock);
-
 
         auto flow = Flow(std::move(blocks));
         auto coder = Coder(std::move(flow));

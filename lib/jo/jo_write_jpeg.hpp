@@ -4,7 +4,7 @@
 #include <iterator>
 #include <fstream>
 
-#include "tables.hpp""
+#include "tables.hpp"
 
 void jo_writeBits(std::ofstream& outFile, int &bitBuf, int &bitCnt,
                          const unsigned short *bs);

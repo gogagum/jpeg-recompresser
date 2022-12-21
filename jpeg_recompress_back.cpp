@@ -2,6 +2,10 @@
 #include <string>
 #include <fstream>
 
+#include "archiever/include/word/int_range_word.hpp"
+#include "archiever/include/dictionary/adaptive_dictionary.hpp"
+#include "archiever/include/arithmetic_decoder.hpp"
+
 #include "lib/file_io.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -23,6 +27,25 @@ int main(int argc, char* argv[]) {
         int width = jrec::io::readT<int>(inCompressed);
         int height = jrec::io::readT<int>(inCompressed);
         int ncomp = jrec::io::readT<int>(inCompressed);
+        int minBlk = jrec::io::readT<int>(inCompressed);
+
+        std::uint16_t numBits = jrec::io::readT<std::uint16_t>(inCompressed);
+
+        inCompressed.seekg(0, std::ios::beg);
+
+        auto inBuff = jrec::io::readFileBuff(inCompressed);
+
+        std::size_t offset = 5 * sizeof(int) + sizeof(std::uint16_t) /* numBits */;
+
+        std::vector<std::byte> inBufCut;
+        inBufCut.resize(inBuff.size() - offset);
+        std::memcpy(inBufCut.data(), inBuff.data(), inBufCut.size());
+
+        using Word = ga::w::IntegerWord<int, 0, 8>;
+        using Dict = ga::dict::AdaptiveDictionary<Word>;
+        using Decoder = ga::ArithmeticDecoder<Word, Dict>;
+
+        auto decoded = ga::ArithmeticDecoderDecoded(std::move(inBufCut));
 
 
 

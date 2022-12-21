@@ -41,10 +41,14 @@ int main(int argc, char* argv[]) {
         int height = nj.getHeight();
         int ncomp = nj.ncomp;
 
-        //auto [minBlock, maxBlock] = std::minmax(blocks.begin(), blocks.end());
+        auto [minBlock, maxBlock] = std::minmax(blocks.begin(), blocks.end());
 
-        using Flow = ga::fl::IntegerWordFlow<int, -128, 1>;
-        using Word = ga::w::IntegerWord<int, -128, 1>;
+        for (auto& blk : blocks) {
+            blk -= *minBlock;
+        }
+
+        using Flow = ga::fl::IntegerWordFlow<int, 0, 8>;
+        using Word = ga::w::IntegerWord<int, 0, 8>;
         using Dict = ga::dict::AdaptiveDictionary<Word>;
         using Coder = ga::ArithmeticCoder<Flow, Dict>;
 
@@ -57,6 +61,7 @@ int main(int argc, char* argv[]) {
         jrec::io::writeT(outCompressed, width);
         jrec::io::writeT(outCompressed, height);
         jrec::io::writeT(outCompressed, ncomp);
+        jrec::io::writeT(outCompressed, *minBlock);
 
         outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
 

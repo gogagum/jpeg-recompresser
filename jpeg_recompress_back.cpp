@@ -5,6 +5,7 @@
 #include "archiever/include/word/int_range_word.hpp"
 #include "archiever/include/dictionary/adaptive_dictionary.hpp"
 #include "archiever/include/arithmetic_decoder.hpp"
+#include "archiever/include/arithmetic_decoder_decoded.hpp"
 
 #include "lib/file_io.hpp"
 
@@ -47,6 +48,19 @@ int main(int argc, char* argv[]) {
 
         auto decoded = ga::ArithmeticDecoderDecoded(std::move(inBufCut));
 
+        auto decoder = Decoder(std::move(decoded));
+        auto ret = decoder.decode();
+
+        std::vector<int> blocks;
+
+        for (auto w: ret.syms) {
+            blocks.push_back(w.getValue());
+            *blocks.rbegin() += minBlk;
+        }
+
+        auto blocksIter = blocks.begin();
+
+        //jo_write_jpg(blocksIter, outJpeg, width, height, ncomp, imageQuality);
 
 
     } catch (std::runtime_error& err) {

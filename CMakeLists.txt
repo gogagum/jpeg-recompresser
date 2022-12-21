@@ -32,7 +32,9 @@ if(Boost_FOUND)
 
 
     add_executable(jpeg_recompress_back.cpp jpeg_recompress_back.cpp
-                   lib/file_io.cpp)
+                   lib/file_io.cpp
+                   archiever/include/arithmetic_decoder_decoded.hpp
+                   archiever/include/arithmetic_decoder_decoded.cpp)
 
     install(TARGETS draft-enc draft-dec
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

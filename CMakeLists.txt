@@ -24,11 +24,11 @@ if(Boost_FOUND)
     #               draft/lib/enc/jo_write_jpeg.hpp)
     #add_executable(draft-dec draft/lib/jpegdec.cpp draft/lib/dec/nanojpeg.cpp)
 
-    #add_executable(jpeg-recompress jpeg_recompress.cpp
-    #               lib/file_io.cpp lib/nj/nanojpeg.cpp
-    #               archiever/include/arithmetic_coder.hpp
-    #               archiever/include/arithmetic_coder_encoded.hpp
-    #               archiever/include/arithmetic_coder_encoded.cpp)
+    add_executable(jpeg-recompress jpeg_recompress.cpp
+                   lib/file_io.cpp lib/nj/nanojpeg.cpp
+                   archiever/include/arithmetic_coder.hpp
+                   archiever/include/arithmetic_coder_encoded.hpp
+                   archiever/include/arithmetic_coder_encoded.cpp)
 
 
     add_executable(jpeg_recompress_back jpeg_recompress_back.cpp
@@ -37,7 +37,7 @@ if(Boost_FOUND)
                    archiever/include/arithmetic_decoder_decoded.cpp
                    lib/jo/jo_write_jpeg.cpp)
 
-    install(TARGETS draft-enc draft-dec
+    install(TARGETS jpeg-recompress jpeg_recompress_back
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 

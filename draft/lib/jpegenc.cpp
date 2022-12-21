@@ -44,8 +44,6 @@ bool jo_write_jpg(const char *filename, const void *data, int width, int height,
 #include <iterator>
 #include "enc/tables.hpp"
 
-FILE *fp2;
-
 static void jo_writeBits(std::ofstream& outFile, int &bitBuf, int &bitCnt,
                          const unsigned short *bs) {
     bitCnt += bs[1];
@@ -117,10 +115,10 @@ static void jo_calcBits(int val, unsigned short bits[2]) {
 
 template <std::input_iterator IteratorT>
 int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
-                        int &bitBuf, int &bitCnt, float *CDU, int du_stride,
-                        float *fdtbl, int DC,
-                        const unsigned short HTDC[256][2],
-                        const unsigned short HTAC[256][2]) {
+                 int &bitBuf, int &bitCnt, float *CDU, int du_stride,
+                 float *fdtbl, int DC,
+                 const unsigned short HTDC[256][2],
+                 const unsigned short HTAC[256][2]) {
     const unsigned short EOB[2] = { HTAC[0x00][0], HTAC[0x00][1] };
     const unsigned short M16zeroes[2] = { HTAC[0xF0][0], HTAC[0xF0][1] };
 
@@ -159,8 +157,7 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
     int diff = DU[0] - DC;
     if (diff == 0) {
         writeJpegBits(HTDC[0]);
-    }
-    else {
+    } else {
         unsigned short bits[2];
         jo_calcBits(diff, bits);
         writeJpegBits(HTDC[bits[1]]);
@@ -206,7 +203,7 @@ struct QualityEstimation {
 
 QualityEstimation estimQuality(int quality) {
     quality = quality ? quality : 90;
-    bool subsample = quality <= 90 ? 1 : 0;
+    bool subsample = (quality <= 90) ? 1 : 0;
     quality = quality < 1 ? 1 : quality > 100 ? 100 : quality;
     quality = quality < 50 ? 5000 / quality : 200 - quality * 2;
     return { quality, subsample };
@@ -218,9 +215,9 @@ std::array<unsigned char, 24> calcHead1(int width, int height, bool subsample) {
     unsigned char w0 = width >> 8;
     unsigned char w1 = width & 0xFF;
     return std::array<unsigned char, 24>{
-        0xFF, 0xC0, 0, 0x11, 8, h0, h1, w0, w1, 3, 1,
-        (unsigned char) (subsample ? 0x22 : 0x11), 0,
-        2, 0x11, 1, 3, 0x11, 1, 0xFF, 0xC4, 0x01, 0xA2, 0
+        0xFF, 0xC0, 0x00, 0x11, 0x08, h0, h1, w0, w1, 0x03, 0x01,
+        (unsigned char) (subsample ? 0x22 : 0x11), 0x00,
+        0x02, 0x11, 0x01, 0x03, 0x11, 0x01, 0xFF, 0xC4, 0x01, 0xA2, 0x00
     };
 }
 
@@ -267,13 +264,12 @@ bool jo_write_headers(std::ofstream& outBinary, int width, int height,
     outBinary.put(0x10); // HTYACinfo
     writeArr(tbl::std_ac_luminance_nrcodes, 1);
     writeArr(tbl::std_ac_luminance_values);
-    outBinary.put(1); // HTUDCinfo
+    outBinary.put(0x01); // HTUDCinfo
     writeArr(tbl::std_dc_chrominance_nrcodes, 1);
     writeArr(tbl::std_dc_chrominance_values);
     outBinary.put(0x11); // HTUACinfo
     writeArr(tbl::std_ac_chrominance_nrcodes, 1);
     writeArr(tbl::std_ac_chrominance_values);
-    writeArr(tbl::head2);
     return true;
 }
 
@@ -287,6 +283,15 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
     if (!jo_write_headers(outJpeg, width, height, comp, quality)) {
         return false;
     }
+
+    const auto writeArr =
+        [&outJpeg](const auto& arr, std::size_t startOffset = 0) {
+            outJpeg.write(reinterpret_cast<const char*>(arr.data() + startOffset),
+                            arr.size() - startOffset);
+        };
+
+    outJpeg.put(0xFF);
+    writeArr(tbl::head2);
 
     const auto [actualQuality, subsample] = estimQuality(quality);
 

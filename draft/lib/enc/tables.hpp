@@ -245,8 +245,8 @@ const auto head0 = std::array<unsigned char, 25>{
     0, 0, 0xFF, 0xDB, 0, 0x84, 0
 };
 
-const auto head2 = std::array<unsigned char, 14>{
-    0xFF, 0xDA, 0, 0xC, 3, 1, 0, 2, 0x11, 3, 0x11, 0, 0x3F, 0
+const auto head2 = std::array<unsigned char, 13>{
+    0xDA, 0, 0xC, 3, 1, 0, 2, 0x11, 3, 0x11, 0, 0x3F, 0
 };
 
 }

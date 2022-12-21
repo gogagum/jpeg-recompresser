@@ -22,7 +22,10 @@ if(Boost_FOUND)
     add_executable(draft-enc draft/lib/jpegenc.cpp)
     add_executable(draft-dec draft/lib/jpegdec.cpp draft/lib/dec/nanojpeg.cpp)
 
-    add_executable(jpeg-recompress jpeg_recompress.cpp)
+    add_executable(jpeg-recompress jpeg_recompress.cpp
+                   lib/file_io.cpp lib/nj/nanojpeg.cpp)
+    add_executable(jpeg_recompress_back.cpp jpeg_recompress_back.cpp
+                   lib/file_io.cpp)
 
     install(TARGETS draft-enc draft-dec
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

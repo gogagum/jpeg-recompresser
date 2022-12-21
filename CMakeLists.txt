@@ -19,10 +19,10 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 
 if(Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
-    #add_executable(draft-enc draft/lib/jpegenc.cpp
-    #               draft/lib/enc/jo_write_jpeg.cpp
-    #               draft/lib/enc/jo_write_jpeg.hpp)
-    #add_executable(draft-dec draft/lib/jpegdec.cpp draft/lib/dec/nanojpeg.cpp)
+    add_executable(draft-enc draft/lib/jpegenc.cpp
+                   draft/lib/enc/jo_write_jpeg.cpp
+                   draft/lib/enc/jo_write_jpeg.hpp)
+    add_executable(draft-dec draft/lib/jpegdec.cpp draft/lib/dec/nanojpeg.cpp)
 
     add_executable(jpeg-recompress jpeg_recompress.cpp
                    lib/file_io.cpp lib/nj/nanojpeg.cpp

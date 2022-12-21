@@ -75,6 +75,7 @@
 #include <vector>
 #include <iterator>
 #include <algorithm>
+#include <iomanip>
 
 std::vector<char> readFileBuff(const std::string& filename) {
     std::ifstream inJpeg(filename, std::ios::binary);
@@ -125,8 +126,16 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    for (auto block: blocks) {
-        outBlocks << block << ' ';
+    //std::cout << blocks.size() << std::endl;
+
+    for (std::size_t i = 0; i * 64 < blocks.size(); ++i) {
+        for (std::size_t j = 0; j < 8; ++j) {
+            for (std::size_t k = 0; k < 8; ++k) {
+                outBlocks << std::setw(4) << blocks[i * 64 + j * 8 + k];
+            }
+            outBlocks << std::endl;
+        }
+        outBlocks << std::endl;
     }
 
     nj = nj_context_t{};

@@ -9,6 +9,7 @@
 
 #include "lib/file_io.hpp"
 #include "lib/nj/nanojpeg.h"
+#include "lib/magical/process.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -41,30 +42,56 @@ int main(int argc, char* argv[]) {
         int height = nj.getHeight();
         int ncomp = nj.ncomp;
 
-        auto [minBlockIt, maxBlockIt] = std::minmax_element(blocks.begin(), blocks.end());
+        auto process = Process(blocks);
+        auto [offset, escStart, blocksProcessed] = process.process();
 
-        int minBlock = *minBlockIt;
-        int maxBlock = *maxBlockIt;
-
-        for (auto& blk : blocks) {
-            blk -= minBlock;
+        for (auto comprIt = blocksProcessed.begin(); comprIt < blocksProcessed.begin() + 100; ++comprIt) {
+            std::cout << *comprIt << " ";
         }
 
-        int range = maxBlock - minBlock + 1;
+        std::cout << std::endl;
+        std::cout << offset << std::endl;
+        std::cout << escStart << std::endl;
 
         jrec::io::writeT(outCompressed, imageQuality);
         jrec::io::writeT(outCompressed, width);
         jrec::io::writeT(outCompressed, height);
         jrec::io::writeT(outCompressed, ncomp);
-        jrec::io::writeT(outCompressed, minBlock);
+        jrec::io::writeT(outCompressed, offset);
+        jrec::io::writeT(outCompressed, escStart);
 
-        if (range < 256) {
-            using Flow = ga::fl::IntegerWordFlow<int, 0, 8>;
-            using Word = ga::w::IntegerWord<int, 0, 8>;
-            using Dict = ga::dict::AdaptiveDictionary<Word>;
+        int maxBlock = *std::max_element(blocksProcessed.begin(), blocksProcessed.end());
+
+
+        if (maxBlock < 64) {
+            using Flow = ga::fl::IntegerWordFlow<int, 0, 6>;
+            using Word = ga::w::IntegerWord<int, 0, 6>;
+            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
             using Coder = ga::ArithmeticCoder<Flow, Dict>;
 
-            auto flow = Flow(std::move(blocks));
+            auto flow = Flow(std::move(blocksProcessed));
+            auto coder = Coder(std::move(flow));
+            auto encoded = coder.encode();
+
+            outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
+        } else if (maxBlock < 128) {
+            using Flow = ga::fl::IntegerWordFlow<int, 0, 7>;
+            using Word = ga::w::IntegerWord<int, 0, 7>;
+            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
+            using Coder = ga::ArithmeticCoder<Flow, Dict>;
+
+            auto flow = Flow(std::move(blocksProcessed));
+            auto coder = Coder(std::move(flow));
+            auto encoded = coder.encode();
+
+            outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
+        } else if (maxBlock < 256) {
+            using Flow = ga::fl::IntegerWordFlow<int, 0, 8>;
+            using Word = ga::w::IntegerWord<int, 0, 8>;
+            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
+            using Coder = ga::ArithmeticCoder<Flow, Dict>;
+
+            auto flow = Flow(std::move(blocksProcessed));
             auto coder = Coder(std::move(flow));
             auto encoded = coder.encode();
 
@@ -72,10 +99,10 @@ int main(int argc, char* argv[]) {
         } else {
             using Flow = ga::fl::IntegerWordFlow<int, 0, 16>;
             using Word = ga::w::IntegerWord<int, 0, 16>;
-            using Dict = ga::dict::AdaptiveDictionary<Word>;
+            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
             using Coder = ga::ArithmeticCoder<Flow, Dict>;
 
-            auto flow = Flow(std::move(blocks));
+            auto flow = Flow(std::move(blocksProcessed));
             auto coder = Coder(std::move(flow));
             auto encoded = coder.encode();
 

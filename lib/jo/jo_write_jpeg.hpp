@@ -3,7 +3,6 @@
 
 #include <iterator>
 #include <fstream>
-#include <iostream>
 
 #include "tables.hpp""
 
@@ -54,11 +53,9 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
             int n = *inDCT;
             ++inDCT;
 
-            std::cout << " " << n;
             DU[tbl::s_jo_ZigZag[j]] = n;// (int)(v < 0 ? ceilf(v - 0.5f) : floorf(v + 0.5f));
         }
     }
-    std::cout << "\n";
     int n;
 
     const auto writeJpegBits = [&outJpeg, &bitBuf, &bitCnt](auto bits) {

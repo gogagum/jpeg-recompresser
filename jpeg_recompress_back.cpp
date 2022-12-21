@@ -8,6 +8,7 @@
 #include "archiever/include/arithmetic_decoder_decoded.hpp"
 
 #include "lib/file_io.hpp"
+#include "lib/jo/jo_write_jpeg.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -40,7 +41,7 @@ int main(int argc, char* argv[]) {
 
         std::vector<std::byte> inBufCut;
         inBufCut.resize(inBuff.size() - offset);
-        std::memcpy(inBufCut.data(), inBuff.data(), inBufCut.size());
+        std::memcpy(inBufCut.data(), inBuff.data() + offset, inBufCut.size());
 
         using Word = ga::w::IntegerWord<int, 0, 8>;
         using Dict = ga::dict::AdaptiveDictionary<Word>;
@@ -60,9 +61,7 @@ int main(int argc, char* argv[]) {
 
         auto blocksIter = blocks.begin();
 
-        //jo_write_jpg(blocksIter, outJpeg, width, height, ncomp, imageQuality);
-
-
+        jo_write_jpg(blocksIter, outJpeg, width, height, ncomp, imageQuality);
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;
         return 1;

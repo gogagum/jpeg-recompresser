@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
         int ncomp = jrec::io::readT<int>(inCompressed);
         int minBlk = jrec::io::readT<int>(inCompressed);
 
-        std::uint16_t numBits = jrec::io::readT<std::uint16_t>(inCompressed);
+        std::uint16_t numBits = jrec::io::deserializeNumBits(inCompressed);
 
         inCompressed.seekg(0, std::ios::beg);
 
@@ -43,20 +43,28 @@ int main(int argc, char* argv[]) {
         inBufCut.resize(inBuff.size() - offset);
         std::memcpy(inBufCut.data(), inBuff.data() + offset, inBufCut.size());
 
-        using Word = ga::w::IntegerWord<int, 0, 7>;
-        using Dict = ga::dict::AdaptiveDictionary<Word>;
-        using Decoder = ga::ArithmeticDecoder<Word, Dict>;
-
-        auto decoded = ga::ArithmeticDecoderDecoded(std::move(inBufCut));
-
-        auto decoder = Decoder(std::move(decoded));
-        auto ret = decoder.decode();
-
         std::vector<int> blocks;
 
-        for (auto w: ret.syms) {
-            blocks.push_back(w.getValue());
-            *blocks.rbegin() += minBlk;
+        if (numBits == 8) {
+            using Word = ga::w::IntegerWord<int, 0, 8>;
+            using Dict = ga::dict::AdaptiveDictionary<Word>;
+            using Decoder = ga::ArithmeticDecoder<Word, Dict>;
+            auto decoded = ga::ArithmeticDecoderDecoded(std::move(inBufCut));
+            auto decoder = Decoder(std::move(decoded));
+            auto syms = decoder.decode().syms;
+            for (auto w: syms) {
+                blocks.push_back(w.getValue() + minBlk);
+            }
+        } else {
+            using Word = ga::w::IntegerWord<int, 0, 16>;
+            using Dict = ga::dict::AdaptiveDictionary<Word>;
+            using Decoder = ga::ArithmeticDecoder<Word, Dict>;
+            auto decoded = ga::ArithmeticDecoderDecoded(std::move(inBufCut));
+            auto decoder = Decoder(std::move(decoded));
+            auto syms = decoder.decode().syms;
+            for (auto w: syms) {
+                blocks.push_back(w.getValue() + minBlk);
+            }
         }
 
         auto blocksIter = blocks.begin();

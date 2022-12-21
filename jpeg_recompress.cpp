@@ -43,16 +43,14 @@ int main(int argc, char* argv[]) {
 
         auto [minBlockIt, maxBlockIt] = std::minmax_element(blocks.begin(), blocks.end());
 
-        auto minBlock = *minBlockIt;
+        int minBlock = *minBlockIt;
+        int maxBlock = *maxBlockIt;
 
         for (auto& blk : blocks) {
             blk -= minBlock;
         }
 
-        using Flow = ga::fl::IntegerWordFlow<int, 0, 7>;
-        using Word = ga::w::IntegerWord<int, 0, 7>;
-        using Dict = ga::dict::AdaptiveDictionary<Word>;
-        using Coder = ga::ArithmeticCoder<Flow, Dict>;
+        int range = maxBlock - minBlock + 1;
 
         jrec::io::writeT(outCompressed, imageQuality);
         jrec::io::writeT(outCompressed, width);
@@ -60,11 +58,29 @@ int main(int argc, char* argv[]) {
         jrec::io::writeT(outCompressed, ncomp);
         jrec::io::writeT(outCompressed, minBlock);
 
-        auto flow = Flow(std::move(blocks));
-        auto coder = Coder(std::move(flow));
-        auto encoded = coder.encode();
+        if (range < 256) {
+            using Flow = ga::fl::IntegerWordFlow<int, 0, 8>;
+            using Word = ga::w::IntegerWord<int, 0, 8>;
+            using Dict = ga::dict::AdaptiveDictionary<Word>;
+            using Coder = ga::ArithmeticCoder<Flow, Dict>;
 
-        outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
+            auto flow = Flow(std::move(blocks));
+            auto coder = Coder(std::move(flow));
+            auto encoded = coder.encode();
+
+            outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
+        } else {
+            using Flow = ga::fl::IntegerWordFlow<int, 0, 16>;
+            using Word = ga::w::IntegerWord<int, 0, 16>;
+            using Dict = ga::dict::AdaptiveDictionary<Word>;
+            using Coder = ga::ArithmeticCoder<Flow, Dict>;
+
+            auto flow = Flow(std::move(blocks));
+            auto coder = Coder(std::move(flow));
+            auto encoded = coder.encode();
+
+            outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
+        }
 
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;

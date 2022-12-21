@@ -47,4 +47,12 @@ std::vector<char> readFileBuff(std::ifstream& file) {
     return buff;
 }
 
+//----------------------------------------------------------------------------//
+std::uint16_t deserializeNumBits(std::ifstream& stream)  {
+    std::uint16_t r1 = readT<unsigned char>(stream);
+    std::uint16_t r2 = readT<unsigned char>(stream);
+
+    return (r1 << 8) + r2;
+};
+
 }  // namespace jrec::io

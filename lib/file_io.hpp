@@ -19,10 +19,13 @@ T readT(std::ifstream& stream) {
     return ret;
 }
 
+std::uint16_t deserializeNumBits(std::ifstream& stream);
+
 template <class T>
 void writeT(std::ofstream& stream, const T& toWrite) {
     stream.write(reinterpret_cast<const char*>(&toWrite), sizeof(T));
 }
+
 
 
 }  // namespace jrec::io

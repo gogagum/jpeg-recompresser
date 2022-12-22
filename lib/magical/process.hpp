@@ -3,77 +3,58 @@
 
 #include <vector>
 #include <array>
+#include <cassert>
 #include <algorithm>
 
 class Process {
-public:
-
-    constexpr static auto numErased = std::array{ 64, 63, 62, 60, 56, 48 };
-    constexpr static std::size_t numEsc = numErased.size();
-
 public:
     Process(const std::vector<int> els) : _els(std::move(els)) {
         auto [minIter, maxIter] = std::minmax_element(_els.begin(), _els.end());
         _minEl = *minIter;
         _maxEl = *maxIter;
+        assert(_els.size() % 64 == 0);
     }
 
-    struct Res {
+    struct Ret {
         int offset;
-        int escStart;
-        std::vector<int> elements;
+        std::vector<int> nums;
     };
 
-    Res process() {
-        int retOffset = _minEl;
-
-        for (std::size_t i = 0; i < numEsc; ++i) {
-            _process(i);
+    Ret process() {
+        auto iter = _els.cbegin();
+        while (iter != _els.cend()) {
+            _process64(iter);
         }
-
-        for (auto& el: _els) {
-            el -= _minEl;
-        }
-
-        _minEl = 0;
-        _maxEl -= retOffset;
-
-        return { retOffset, _maxEl + 1, _els };
+        return { _minEl, _ret };
     }
 
+    int esc() const {
+        return _maxEl - _minEl + 1;
+    }
 
 private:
+    void _process64(std::vector<int>::const_iterator& input) {
+        std::size_t numNonZero = 64;
 
-    void _process(std::size_t iter) {
-        std::vector<int> tmp;
-        auto currElsIter = _els.begin();
-        while (currElsIter != _els.end()) {
-            if (_els.end() < currElsIter + numErased[iter]) {
-                for (; currElsIter < _els.end(); ++currElsIter) {
-                    tmp.push_back(*currElsIter);
-                }
-            } else if (checkZeros(currElsIter, iter)) {
-                tmp.push_back(_maxEl + iter + 1);
-                currElsIter += numErased[iter];
-            } else {
-                tmp.push_back(*currElsIter);
-                ++currElsIter;
-            }
+        while (numNonZero > 0 && input[numNonZero - 1] == 0) {
+            --numNonZero;
         }
-        _els = tmp;
-    }
 
-    bool checkZeros(std::vector<int>::iterator it, std::size_t iter) {
-        for (auto it_ = it; it_ < it + numErased[iter]; ++it_) {
-            if (*it_ != 0) {
-                return false;
+        if (numNonZero == 0) {
+            _ret.push_back(2 * esc());
+        } else {
+            for (std::size_t i = 0; i + 1 < numNonZero; ++i) {
+                _ret.push_back(input[i] - _minEl);
             }
+            _ret.push_back(input[numNonZero-1] - _minEl + esc());
         }
-        return true;
+
+        input += 64;
     }
 
 private:
     std::vector<int> _els;
+    std::vector<int> _ret;
     int _minEl;
     int _maxEl;
 };

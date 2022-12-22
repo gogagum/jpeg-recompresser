@@ -5,44 +5,45 @@
 #include <algorithm>
 #include <vector>
 #include <cstdint>
+#include <cassert>
 
 class ProcessBack {
 public:
-
-    constexpr static auto numErased = std::array{ 64, 63, 62, 60, 56, 48 };
-    constexpr static std::size_t numEsc = numErased.size();
-
-public:
-    ProcessBack(std::vector<int> els, int escStart, int offset) : _els(els), _escStart(escStart), _offset(offset) {
-
-    }
+    ProcessBack(std::vector<int> els, int offset)
+        : _els(els), _offset(offset),
+          _esc((*std::max_element(els.begin(), els.end())) / 2) {}
 
     std::vector<int> process() {
-        std::vector<int> ret;
-        for (auto el : _els) {
-            if (el >= _escStart) {
-                std::size_t escIndex = el - _escStart;
-                _processEsc(ret, escIndex);
-            } else {
-                ret.push_back(el + _offset);
-            }
-
+        auto iter = _els.cbegin();
+        while (iter != _els.cend()) {
+            _process64(iter);
         }
-        return ret;
+        return _ret;
     }
 
 private:
 
-    void _processEsc(std::vector<int>& ret, std::size_t idx) {
-        for (std::size_t i = 0; i < numErased[idx]; ++i) {
-            ret.push_back(0);
+    void _process64(std::vector<int>::const_iterator& iter) {
+        std::size_t written = 0;
+
+        if (*iter != 2 * _esc) {
+            for (; written < 64 && *iter < _esc; ++written, ++iter) {
+                _ret.push_back(*iter + _offset);
+            }
+            _ret.push_back(*iter + _offset - _esc);
+            ++written;
+        }
+        ++iter;
+
+        for (; written < 64; ++written) {
+            _ret.push_back(0);
         }
     }
-
 
 private:
     std::vector<int> _els;
-    int _escStart;
+    std::vector<int> _ret;
+    int _esc;
     int _offset;
 };
 

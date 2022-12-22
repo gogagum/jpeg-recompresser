@@ -31,7 +31,6 @@ int main(int argc, char* argv[]) {
         int height = jrec::io::readT<int>(inCompressed);
         int ncomp = jrec::io::readT<int>(inCompressed);
         int seqOffset = jrec::io::readT<int>(inCompressed);
-        int escStart = jrec::io::readT<int>(inCompressed);
 
         std::uint16_t numBits = jrec::io::deserializeNumBits(inCompressed);
 
@@ -39,7 +38,7 @@ int main(int argc, char* argv[]) {
 
         auto inBuff = jrec::io::readFileBuff(inCompressed);
 
-        std::size_t offset = 6 * sizeof(int) + sizeof(std::uint16_t) /* numBits */;
+        std::size_t offset = 5 * sizeof(int) + sizeof(std::uint16_t) /* numBits */;
 
         std::vector<std::byte> inBufCut;
         inBufCut.resize(inBuff.size() - offset);
@@ -89,7 +88,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        auto process = ProcessBack(blocks, escStart, seqOffset);
+        auto process = ProcessBack(blocks, seqOffset);
         blocks = process.process();
 
         auto blocksIter = blocks.begin();

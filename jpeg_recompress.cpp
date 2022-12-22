@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
         int ncomp = nj.ncomp;
 
         auto process = Process(blocks);
-        auto [offset, escStart, blocksProcessed] = process.process();
+        auto [offset, blocksProcessed] = process.process();
 
         for (auto comprIt = blocksProcessed.begin(); comprIt < blocksProcessed.begin() + 100; ++comprIt) {
             std::cout << *comprIt << " ";
@@ -51,14 +51,12 @@ int main(int argc, char* argv[]) {
 
         std::cout << std::endl;
         std::cout << offset << std::endl;
-        std::cout << escStart << std::endl;
 
         jrec::io::writeT(outCompressed, imageQuality);
         jrec::io::writeT(outCompressed, width);
         jrec::io::writeT(outCompressed, height);
         jrec::io::writeT(outCompressed, ncomp);
         jrec::io::writeT(outCompressed, offset);
-        jrec::io::writeT(outCompressed, escStart);
 
         int maxBlock = *std::max_element(blocksProcessed.begin(), blocksProcessed.end());
 

@@ -5,7 +5,7 @@
 #include "archiever/include/flow/int_range_word_flow.hpp"
 #include "archiever/include/arithmetic_coder.hpp"
 #include "archiever/include/dictionary/adaptive_dictionary.hpp"
-#include "archiever/include/dictionary/static_dictionary.hpp"
+//#include "archiever/include/dictionary/static_dictionary.hpp"
 
 #include "lib/file_io.hpp"
 #include "lib/nj/nanojpeg.h"
@@ -42,8 +42,7 @@ int main(int argc, char* argv[]) {
         int height = nj.getHeight();
         int ncomp = nj.ncomp;
 
-        auto process = Process(blocks);
-        auto [offset, blocksProcessed] = process.process();
+        auto [offset, blocksProcessed] = Process::process(std::move(blocks));
 
         for (auto comprIt = blocksProcessed.begin(); comprIt < blocksProcessed.begin() + 100; ++comprIt) {
             std::cout << *comprIt << " ";

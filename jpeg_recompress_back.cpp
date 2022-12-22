@@ -88,9 +88,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        auto process = ProcessBack(blocks, seqOffset);
-        blocks = process.process();
-
+        blocks = ProcessBack::process(std::move(blocks), seqOffset);
         auto blocksIter = blocks.begin();
 
         jo_write_jpg(blocksIter, outJpeg, width, height, ncomp, imageQuality);

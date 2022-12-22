@@ -1,0 +1,4 @@
+#ifndef DC_AC_SEPARATOR_HPP
+#define DC_AC_SEPARATOR_HPP
+
+#endif // DC_AC_SEPARATOR_HPP

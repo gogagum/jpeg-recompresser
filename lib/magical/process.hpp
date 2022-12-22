@@ -6,51 +6,35 @@
 #include <cassert>
 #include <algorithm>
 
+////////////////////////////////////////////////////////////////////////////////
+/// \brief The Process class
+///
 class Process {
 public:
-    Process(const std::vector<int> els) : _els(std::move(els)) {
-        auto [minIter, maxIter] = std::minmax_element(_els.begin(), _els.end());
-        _minEl = *minIter;
-        _maxEl = *maxIter;
-        assert(_els.size() % 64 == 0);
-    }
 
     struct Ret {
         int offset;
         std::vector<int> nums;
     };
 
-    Ret process() {
-        auto iter = _els.cbegin();
-        while (iter != _els.cend()) {
-            _process64(iter);
-        }
-        return { _minEl, _ret };
-    }
+public:
 
-    int esc() const {
-        return _maxEl - _minEl + 1;
-    }
+    /**
+     * @brief process
+     * @param els
+     * @return
+     */
+    static Ret process(std::vector<int>&& els);
 
 private:
-    void _process64(std::vector<int>::const_iterator& input) {
-        std::size_t numNonZero = 64;
 
-        while (numNonZero > 0 && input[numNonZero - 1] == 0) {
-            --numNonZero;
-        }
+    Process(std::vector<int>&& els);
 
-        if (numNonZero == 0) {
-            _ret.push_back(2 * esc());
-        } else {
-            for (std::size_t i = 0; i + 1 < numNonZero; ++i) {
-                _ret.push_back(input[i] - _minEl);
-            }
-            _ret.push_back(input[numNonZero-1] - _minEl + esc());
-        }
+    Ret _process();
 
-        input += 64;
-    }
+    int esc() const;
+
+    void _process64(std::vector<int>::const_iterator& input);
 
 private:
     std::vector<int> _els;

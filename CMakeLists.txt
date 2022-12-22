@@ -26,6 +26,7 @@ if(Boost_FOUND)
 
     add_executable(jpeg-recompress jpeg_recompress.cpp
                    lib/file_io.cpp lib/nj/nanojpeg.cpp
+                   lib/magical/process.cpp
                    archiever/include/arithmetic_coder.hpp
                    archiever/include/arithmetic_coder_encoded.hpp
                    archiever/include/arithmetic_coder_encoded.cpp)
@@ -33,6 +34,7 @@ if(Boost_FOUND)
 
     add_executable(jpeg_recompress_back jpeg_recompress_back.cpp
                    lib/file_io.cpp
+                   lib/magical/process_back.cpp
                    archiever/include/arithmetic_decoder_decoded.hpp
                    archiever/include/arithmetic_decoder_decoded.cpp
                    lib/jo/jo_write_jpeg.cpp)

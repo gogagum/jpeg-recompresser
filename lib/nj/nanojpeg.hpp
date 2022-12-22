@@ -1,10 +1,13 @@
-#ifndef _NANOJPEG_H
-#define _NANOJPEG_H
+#ifndef _NANOJPEG_HPP
+#define _NANOJPEG_HPP
 
 #include <iterator>
 #include <vector>
+#include <cassert>
 #include <cstdio>
 #include <cstring>
+
+#include "exceptions.hpp"
 
 #ifndef NJ_CHROMA_FILTER
     #define NJ_CHROMA_FILTER 1
@@ -15,26 +18,9 @@ static const char njZZ[64] = { 0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18,
 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59, 52, 45,
 38, 31, 39, 46, 53, 60, 61, 54, 47, 55, 62, 63 };
 
-#define njThrow(e) do { nj.error = e; return; } while (0)
-#define njCheckError() do { if (nj.error) return; } while (0)
-
-#define njThrowInt(e) do { error = e; return; } while (0)
-#define njCheckErrorInt() do { if (error) return; } while (0)
-
-// nj_result_t: Result codes for njDecode().
-typedef enum _nj_result {
-    NJ_OK = 0,        // no error, decoding successful
-    NJ_NO_JPEG,       // not a JPEG file
-    NJ_UNSUPPORTED,   // unsupported format
-    NJ_OUT_OF_MEM,    // out of memory
-    NJ_INTERNAL_ERR,  // internal error
-    NJ_SYNTAX_ERROR,  // syntax error
-    __NJ_FINISHED,    // used internally, will never be reported
-} nj_result_t;
-
-typedef struct _nj_code {
+struct nj_vlc_code_t {
     unsigned char bits, code;
-} nj_vlc_code_t;
+};
 
 typedef struct _nj_cmp {
     int cid;
@@ -61,9 +47,14 @@ struct nj_context_t {
     void decodeLength();
     void skipMarker();
     void decodeDRI();
+    unsigned char clip(const int x);
+    void colIDCT(const int* blk, unsigned char *out, int stride);
+    unsigned short decode16(const unsigned char *pos);
+    void upsampleH(nj_component_t* c);
+    void upsampleV(nj_component_t* c);
+    void upsample(nj_component_t* c);
+    bool finished = false;
 
-
-    nj_result_t error;
     const unsigned char *pos = nullptr;
     int size;
     int length;
@@ -88,23 +79,8 @@ static nj_context_t nj;
 // Parameters:
 //   jpeg = The pointer to the memory dump.
 //   size = The size of the JPEG file.
-// Return value: The error code in case of failure, or NJ_OK (zero) on success.
 template <std::output_iterator<int> OutIter>
-nj_result_t njDecode(OutIter& out, const void* jpeg, const int size);
-
-// njGetImage: Returns the decoded image data.
-// Returns a pointer to the most recently image. The memory layout it byte-
-// oriented, top-down, without any padding between lines. Pixels of color
-// images will be stored as three consecutive bytes for the red, green and
-// blue channels. This data format is thus compatible with the PGM or PPM
-// file formats and the OpenGL texture formats GL_LUMINANCE8 or GL_RGB8.
-// If njDecode() failed, the result of njGetImage() is undefined.
-static unsigned char* njGetImage(void);
-
-// njGetImageSize: Returns the size (in bytes) of the image data returned
-// by njGetImage(). If njDecode() failed, the result of njGetImageSize() is
-// undefined.
-static int njGetImageSize(void);
+void njDecode(OutIter& out, const void* jpeg, const int size);
 
 constexpr static int W1 = 2841;
 constexpr static int W2 = 2676;
@@ -158,30 +134,21 @@ static inline void njRowIDCT(int* blk) {
     blk[7] = (x7 - x1) >> 8;
 }
 
-unsigned char njClip(const int x);
-
-void njColIDCT(const int* blk, unsigned char *out, int stride);
-
-unsigned short njDecode16(const unsigned char *pos);
-
-int njGetBits(int bits);
-
-void njUpsampleH(nj_component_t* c);
-
-void njUpsampleV(nj_component_t* c);
-
-void njUpsample(nj_component_t* c);
-
 static inline void njDecodeSOF(void) {
     int i, ssxmax = 0, ssymax = 0;
     nj_component_t* c;
     nj.decodeLength();
-    njCheckError();
-    if (nj.length < 9) njThrow(NJ_SYNTAX_ERROR);
-    if (nj.pos[0] != 8) njThrow(NJ_UNSUPPORTED);
-    nj.height = njDecode16(nj.pos+1);
-    nj.width = njDecode16(nj.pos+3);
-    if (!nj.width || !nj.height) njThrow(NJ_SYNTAX_ERROR);
+    if (nj.length < 9) {
+        throw SyntaxErrorException();
+    }
+    if (nj.pos[0] != 8) {
+        throw UnsupportedException();
+    }
+    nj.height = nj.decode16(nj.pos+1);
+    nj.width = nj.decode16(nj.pos+3);
+    if (!nj.width || !nj.height) {
+        throw SyntaxErrorException();
+    }
     nj.ncomp = nj.pos[5];
     nj.skip(6);
     switch (nj.ncomp) {
@@ -189,16 +156,18 @@ static inline void njDecodeSOF(void) {
         case 3:
             break;
         default:
-            njThrow(NJ_UNSUPPORTED);
+            throw UnsupportedException();
     }
-    if (nj.length < (nj.ncomp * 3)) njThrow(NJ_SYNTAX_ERROR);
+    if (nj.length < (nj.ncomp * 3)) {
+        throw SyntaxErrorException();
+    }
     for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
         c->cid = nj.pos[0];
-        if (!(c->ssx = nj.pos[1] >> 4)) njThrow(NJ_SYNTAX_ERROR);
-        if (c->ssx & (c->ssx - 1)) njThrow(NJ_UNSUPPORTED);  // non-power of two
-        if (!(c->ssy = nj.pos[1] & 15)) njThrow(NJ_SYNTAX_ERROR);
-        if (c->ssy & (c->ssy - 1)) njThrow(NJ_UNSUPPORTED);  // non-power of two
-        if ((c->qtsel = nj.pos[2]) & 0xFC) njThrow(NJ_SYNTAX_ERROR);
+        if (!(c->ssx = nj.pos[1] >> 4)) throw SyntaxErrorException();
+        if (c->ssx & (c->ssx - 1)) throw UnsupportedException();  // non-power of two
+        if (!(c->ssy = nj.pos[1] & 15)) throw SyntaxErrorException();
+        if (c->ssy & (c->ssy - 1)) throw UnsupportedException();  // non-power of two
+        if ((c->qtsel = nj.pos[2]) & 0xFC) throw SyntaxErrorException();
         nj.skip(3);
         nj.qtused |= 1 << c->qtsel;
         if (c->ssx > ssxmax) ssxmax = c->ssx;
@@ -217,7 +186,7 @@ static inline void njDecodeSOF(void) {
         c->height = (nj.height * c->ssy + ssymax - 1) / ssymax;
         c->stride = nj.mbwidth * c->ssx << 3;
         if (((c->width < 3) && (c->ssx != ssxmax)) || ((c->height < 3) && (c->ssy != ssymax))) {
-            njThrow(NJ_UNSUPPORTED);
+            throw UnsupportedException();
         }
         c->pixels = std::vector<unsigned char>(c->stride * nj.mbheight * c->ssy << 3);
     }
@@ -232,11 +201,14 @@ static inline void njDecodeDHT(void) {
     nj_vlc_code_t *vlc;
     static unsigned char counts[16];
     nj.decodeLength();
-    njCheckError();
     while (nj.length >= 17) {
         i = nj.pos[0];
-        if (i & 0xEC) njThrow(NJ_SYNTAX_ERROR);
-        if (i & 0x02) njThrow(NJ_UNSUPPORTED);
+        if (i & 0xEC)  {
+            throw SyntaxErrorException();
+        }
+        if (i & 0x02) {
+            throw UnsupportedException();
+        }
         i = (i | (i >> 3)) & 3;  // combined DC/AC + tableid value
         for (codelen = 1;  codelen <= 16;  ++codelen)
             counts[codelen - 1] = nj.pos[codelen];
@@ -247,9 +219,13 @@ static inline void njDecodeDHT(void) {
             spread >>= 1;
             currcnt = counts[codelen - 1];
             if (!currcnt) continue;
-            if (nj.length < currcnt) njThrow(NJ_SYNTAX_ERROR);
+            if (nj.length < currcnt)  {
+                throw SyntaxErrorException();
+            }
             remain -= currcnt << (16 - codelen);
-            if (remain < 0) njThrow(NJ_SYNTAX_ERROR);
+            if (remain < 0)  {
+                throw SyntaxErrorException();
+            }
             for (i = 0;  i < currcnt;  ++i) {
                 unsigned char code = nj.pos[i];
                 for (j = spread;  j;  --j) {
@@ -265,68 +241,82 @@ static inline void njDecodeDHT(void) {
             ++vlc;
         }
     }
-    if (nj.length) njThrow(NJ_SYNTAX_ERROR);
+    if (nj.length)  {
+        throw SyntaxErrorException();
+    }
 }
 
 static inline void njDecodeDQT(void) {
     int i;
     unsigned char *t;
     nj.decodeLength();
-    njCheckError();
     while (nj.length >= 65) {
         i = nj.pos[0];
-        if (i & 0xFC) njThrow(NJ_SYNTAX_ERROR);
+        if (i & 0xFC)  {
+            throw SyntaxErrorException();
+        }
         nj.qtavail |= 1 << i;
         t = &nj.qtab[i][0];
         for (i = 0;  i < 64;  ++i)
             t[i] = nj.pos[i + 1];
         nj.skip(65);
     }
-    if (nj.length) njThrow(NJ_SYNTAX_ERROR);
+    if (nj.length)  {
+        throw SyntaxErrorException();
+    }
 }
 
 static int njGetVLC(nj_vlc_code_t* vlc, unsigned char* code) {
     int value = nj.showBits(16);
     int bits = vlc[value].bits;
-    if (!bits) { nj.error = NJ_SYNTAX_ERROR; return 0; }
+    if (!bits)  {
+        throw SyntaxErrorException();
+    }
     nj.skipBits(bits);
     value = vlc[value].code;
-    if (code) *code = (unsigned char) value;
+    if (code) {
+        *code = (unsigned char) value;
+    }
     bits = value & 15;
-    if (!bits) return 0;
+    if (!bits) {
+        return 0;
+    }
     value = nj.getBits(bits);
-    if (value < (1 << (bits - 1)))
+    if (value < (1 << (bits - 1))) {
         value += ((-1) << bits) + 1;
+    }
     return value;
 }
 
 template <std::output_iterator<int> OutIterT>
-static inline void njDecodeBlock(OutIterT& outBlocks, nj_component_t* c, unsigned char* out)
+static inline void
+njDecodeBlock(OutIterT& outBlocks, nj_component_t* c, unsigned char* out)
 {
     unsigned char code = 0;
-    int value, coef = 0;
+    int coef = 0;
     std::memset(nj.block, 0, sizeof(nj.block));
     c->dcpred += njGetVLC(&nj.vlctab[c->dctabsel][0], NULL);
 
     nj.block[0] = c->dcpred;
 
     do {
-        value = njGetVLC(&nj.vlctab[c->actabsel][0], &code);
+        int value = njGetVLC(&nj.vlctab[c->actabsel][0], &code);
 
         if (!code) break;  // EOB
-        if (!(code & 0x0F) && (code != 0xF0)) njThrow(NJ_SYNTAX_ERROR);
+        if (!(code & 0x0F) && (code != 0xF0))  {
+            throw SyntaxErrorException();
+        }
         coef += (code >> 4) + 1;
 
-        if (coef > 63) njThrow(NJ_SYNTAX_ERROR);
+        if (coef > 63)  {
+            throw SyntaxErrorException();
+        }
 
         nj.block[(int) njZZ[coef]] = value;
-    }
-    while (coef < 63);
-    unsigned int i = 0;
+    } while (coef < 63);
 
-    for(i = 0; i < 64; i++) {
+    for(unsigned int i = 0; i < 64; ++i, ++outBlocks) {
         *outBlocks = nj.block[i];
-        ++outBlocks;
     }
 
     for (coef = 0; coef < 64; coef += 8) {
@@ -334,7 +324,7 @@ static inline void njDecodeBlock(OutIterT& outBlocks, nj_component_t* c, unsigne
     }
 
     for (coef = 0; coef < 8; ++coef) {
-        njColIDCT(&nj.block[coef], &out[coef], c->stride);
+        nj.colIDCT(&nj.block[coef], &out[coef], c->stride);
     }
 }
 
@@ -344,41 +334,53 @@ static inline void njDecodeScan(OutIterT& outBlocksIter) {
     int rstcount = nj.rstinterval, nextrst = 0;
     nj_component_t* c;
     nj.decodeLength();
-    njCheckError();
-    if (nj.length < (4 + 2 * nj.ncomp)) njThrow(NJ_SYNTAX_ERROR);
-    if (nj.pos[0] != nj.ncomp) njThrow(NJ_UNSUPPORTED);
+    if (nj.length < (4 + 2 * nj.ncomp))  {
+        throw SyntaxErrorException();
+    }
+    if (nj.pos[0] != nj.ncomp) {
+        throw UnsupportedException();
+    }
     nj.skip(1);
     for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
-        if (nj.pos[0] != c->cid) njThrow(NJ_SYNTAX_ERROR);
-        if (nj.pos[1] & 0xEE) njThrow(NJ_SYNTAX_ERROR);
+        if (nj.pos[0] != c->cid
+                || nj.pos[1] & 0xEE) {
+            throw SyntaxErrorException();
+        }
         c->dctabsel = nj.pos[1] >> 4;
         c->actabsel = (nj.pos[1] & 1) | 2;
         nj.skip(2);
     }
-    if (nj.pos[0] || (nj.pos[1] != 63) || nj.pos[2]) njThrow(NJ_UNSUPPORTED);
+    if (nj.pos[0] || (nj.pos[1] != 63) || nj.pos[2]) {
+        throw UnsupportedException();
+    }
     nj.skip(nj.length);
     for (mbx = mby = 0;;) {
         for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c)
             for (sby = 0;  sby < c->ssy;  ++sby)
                 for (sbx = 0;  sbx < c->ssx;  ++sbx) {
-                    njDecodeBlock(outBlocksIter, c, &c->pixels[((mby * c->ssy + sby) * c->stride + mbx * c->ssx + sbx) << 3]);
-                    njCheckError();
+                    auto* out = &c->pixels[((mby * c->ssy + sby) * c->stride + mbx * c->ssx + sbx) << 3];
+                    njDecodeBlock(outBlocksIter,c, out);
                 }
         if (++mbx >= nj.mbwidth) {
             mbx = 0;
-            if (++mby >= nj.mbheight) break;
+            if (++mby >= nj.mbheight) {
+                break;
+            }
         }
         if (nj.rstinterval && !(--rstcount)) {
             nj.byteAlign();
             i = nj.getBits(16);
-            if (((i & 0xFFF8) != 0xFFD0) || ((i & 7) != nextrst)) njThrow(NJ_SYNTAX_ERROR);
+            if (((i & 0xFFF8) != 0xFFD0) || ((i & 7) != nextrst))  {
+                throw SyntaxErrorException();
+            }
             nextrst = (nextrst + 1) & 7;
             rstcount = nj.rstinterval;
-            for (i = 0;  i < 3;  ++i)
+            for (i = 0;  i < 3;  ++i) {
                 nj.comp[i].dcpred = 0;
+            }
         }
     }
-    nj.error = __NJ_FINISHED;
+    nj.finished  = true;
 }
 
 static inline void njConvert(void) {
@@ -387,16 +389,14 @@ static inline void njConvert(void) {
     for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
         #if NJ_CHROMA_FILTER
             while ((c->width < nj.width) || (c->height < nj.height)) {
-                if (c->width < nj.width) njUpsampleH(c);
-                njCheckError();
-                if (c->height < nj.height) njUpsampleV(c);
-                njCheckError();
+                if (c->width < nj.width) nj.upsampleH(c);
+                if (c->height < nj.height) nj.upsampleV(c);
             }
         #else
             if ((c->width < nj.width) || (c->height < nj.height))
-                njUpsample(c);
+                nj.upsample(c);
         #endif
-        if ((c->width < nj.width) || (c->height < nj.height)) njThrow(NJ_INTERNAL_ERR);
+        assert(!((c->width < nj.width) || (c->height < nj.height)));
     }
     if (nj.ncomp == 3) {
         // convert to RGB
@@ -410,9 +410,9 @@ static inline void njConvert(void) {
                 int y = py[x] << 8;
                 int cb = pcb[x] - 128;
                 int cr = pcr[x] - 128;
-                *prgb++ = njClip((y            + 359 * cr + 128) >> 8);
-                *prgb++ = njClip((y -  88 * cb - 183 * cr + 128) >> 8);
-                *prgb++ = njClip((y + 454 * cb            + 128) >> 8);
+                *prgb++ = nj.clip((y            + 359 * cr + 128) >> 8);
+                *prgb++ = nj.clip((y -  88 * cb - 183 * cr + 128) >> 8);
+                *prgb++ = nj.clip((y + 454 * cb            + 128) >> 8);
             }
             py += nj.comp[0].stride;
             pcb += nj.comp[1].stride;
@@ -433,61 +433,68 @@ static inline void njConvert(void) {
 }
 
 template <std::output_iterator<int> OutIterT>
-nj_result_t njDecode(OutIterT& out, const void* jpeg, const int size) {
-    nj.pos = (const unsigned char*) jpeg;
+void njDecode(OutIterT& out, const void* jpeg, const int size) {
+    nj.pos = static_cast<const unsigned char*>(jpeg);
     nj.size = size & 0x7FFFFFFF;
-    if (nj.size < 2) return NJ_NO_JPEG;
-    if ((nj.pos[0] ^ 0xFF) | (nj.pos[1] ^ 0xD8)) return NJ_NO_JPEG;
+    if (nj.size < 2
+            || ((nj.pos[0] ^ 0xFF) | (nj.pos[1] ^ 0xD8))) {
+        throw NotJpegException();
+    }
     nj.skip(2);
-    while (!nj.error) {
-        if ((nj.size < 2) || (nj.pos[0] != 0xFF)) return NJ_SYNTAX_ERROR;
+    while (!nj.finished) {
+        if ((nj.size < 2) || (nj.pos[0] != 0xFF))  {
+            throw SyntaxErrorException();
+        }
         nj.skip(2);
         switch (nj.pos[-1]) {
-            case 0xC0: njDecodeSOF();  break;
-            case 0xC4: njDecodeDHT();  break;
-            case 0xDB: njDecodeDQT();  break;
-            case 0xDD: nj.decodeDRI();  break;
+            case 0xC0: njDecodeSOF(); break;
+            case 0xC4: njDecodeDHT(); break;
+            case 0xDB: njDecodeDQT(); break;
+            case 0xDD: nj.decodeDRI(); break;
             case 0xDA: njDecodeScan(out); break;
             case 0xFE: nj.skipMarker(); break;
             default:
-                if ((nj.pos[-1] & 0xF0) == 0xE0)
+                if ((nj.pos[-1] & 0xF0) == 0xE0) {
                     nj.skipMarker();
-                else
-                    return NJ_UNSUPPORTED;
+                } else {
+                    throw UnsupportedException();
+                }
         }
     }
-    if (nj.error != __NJ_FINISHED) return nj.error;
-    nj.error = NJ_OK;
+    if (!nj.finished) {
+        throw std::runtime_error("Tot finished.");
+    }
     njConvert();
-    return nj.error;
 }
 
-static nj_result_t njDecodeHeader(const void* jpegHeader, const int size) {
-    nj.pos = (const unsigned char*)jpegHeader;
+static void njDecodeHeader(const void* jpegHeader, const int size) {
+    nj.pos = static_cast<const unsigned char*>(jpegHeader);
     nj.size = size & 0x7FFFFFFF;
-    if (nj.size < 2) return NJ_NO_JPEG;
-    if ((nj.pos[0] ^ 0xFF) | (nj.pos[1] ^ 0xD8)) return NJ_NO_JPEG;
+    if (nj.size < 2
+            || ((nj.pos[0] ^ 0xFF) | (nj.pos[1] ^ 0xD8))) {
+        throw NotJpegException();
+    }
     nj.skip(2);
-    while (!nj.error) {
+    while (!nj.finished) {
         if (nj.size == 0) { break; }
         nj.skip(2);
         switch (nj.pos[-1]) {
-            case 0xC0: njDecodeSOF();  break;
-            case 0xC4: njDecodeDHT();  break;
-            case 0xDB: njDecodeDQT();  break;
-            case 0xDD: nj.decodeDRI();  break;
+            case 0xC0: njDecodeSOF(); break;
+            case 0xC4: njDecodeDHT(); break;
+            case 0xDB: njDecodeDQT(); break;
+            case 0xDD: nj.decodeDRI(); break;
             case 0xFE: nj.skipMarker(); break;
             default:
-                if ((nj.pos[-1] & 0xF0) == 0xE0)
+                if ((nj.pos[-1] & 0xF0) == 0xE0) {
                     nj.skipMarker();
-                else
-                    return NJ_UNSUPPORTED;
+                } else {
+                    throw UnsupportedException();
+                }
         }
     }
-    nj.error = NJ_OK;
-    return nj.error;
+    nj.finished = true;
 }
 
-#endif//_NANOJPEG_H
+#endif//_NANOJPEG_HPP
 
 

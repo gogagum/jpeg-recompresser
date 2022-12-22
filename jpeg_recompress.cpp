@@ -8,7 +8,7 @@
 //#include "archiever/include/dictionary/static_dictionary.hpp"
 
 #include "lib/file_io.hpp"
-#include "lib/nj/nanojpeg.h"
+#include "lib/nj/nanojpeg.hpp"
 #include "lib/magical/process.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -31,18 +31,14 @@ int main(int argc, char* argv[]) {
 
         std::vector<int> blocks;
 
-        {
-            auto blocksInserter = std::back_inserter(blocks);
-            if (njDecode(blocksInserter, buff.data(), buff.size())) {
-                throw std::runtime_error("Error decoding the input file.");
-            }
-        }
+        auto blocksInserter = std::back_inserter(blocks);
+        njDecode(blocksInserter, buff.data(), buff.size());
 
         int width = nj.getWidth();
         int height = nj.getHeight();
         int ncomp = nj.ncomp;
 
-        auto [offset, blocksProcessed] = Process::process(std::move(blocks));
+        auto [offset, blocksProcessed] = Process<64>::process(std::move(blocks));
 
         for (auto comprIt = blocksProcessed.begin(); comprIt < blocksProcessed.begin() + 100; ++comprIt) {
             std::cout << *comprIt << " ";

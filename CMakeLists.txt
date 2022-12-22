@@ -25,8 +25,10 @@ if(Boost_FOUND)
     add_executable(draft-dec draft/lib/jpegdec.cpp draft/lib/dec/nanojpeg.cpp)
 
     add_executable(jpeg-recompress jpeg_recompress.cpp
-                   lib/file_io.cpp lib/nj/nanojpeg.cpp
-                   lib/magical/process.cpp
+                   lib/nj/nanojpeg.hpp
+                   lib/nj/nanojpeg.cpp
+                   lib/file_io.cpp
+                   lib/magical/process.hpp
                    archiever/include/arithmetic_coder.hpp
                    archiever/include/arithmetic_coder_encoded.hpp
                    archiever/include/arithmetic_coder_encoded.cpp)

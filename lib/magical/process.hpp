@@ -9,6 +9,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 /// \brief The Process class
 ///
+template <std::size_t blockSize>
 class Process {
 public:
 
@@ -34,7 +35,7 @@ private:
 
     int esc() const;
 
-    void _process64(std::vector<int>::const_iterator& input);
+    void _processBlock(std::vector<int>::const_iterator& input);
 
 private:
     std::vector<int> _els;
@@ -42,5 +43,61 @@ private:
     int _minEl;
     int _maxEl;
 };
+
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+template <std::size_t blockSize>
+auto Process<blockSize>::process(std::vector<int>&& els) -> Ret {
+    auto processor = Process(std::move(els));
+    return processor._process();
+}
+
+//----------------------------------------------------------------------------//
+template <std::size_t blockSize>
+Process<blockSize>::Process(std::vector<int>&& els) : _els(std::move(els)) {
+    auto [minIter, maxIter] = std::minmax_element(_els.begin(), _els.end());
+    _minEl = *minIter;
+    _maxEl = *maxIter;
+    assert(_els.size() % 64 == 0);
+}
+
+//----------------------------------------------------------------------------//
+template <std::size_t blockSize>
+auto Process<blockSize>::_process() -> Ret {
+    auto iter = _els.cbegin();
+    while (iter != _els.cend()) {
+        _processBlock(iter);
+    }
+    return { _minEl, _ret };
+}
+
+//----------------------------------------------------------------------------//
+template <std::size_t blockSize>
+int Process<blockSize>::esc() const {
+    return _maxEl - _minEl + 1;
+}
+
+//----------------------------------------------------------------------------//
+template <std::size_t blockSize>
+void
+Process<blockSize>::_processBlock(std::vector<int>::const_iterator& input) {
+    std::size_t numNonZero = blockSize;
+
+    for (; numNonZero > 0 && input[numNonZero - 1] == 0; --numNonZero) {}
+
+    if (numNonZero == 0) {
+        _ret.push_back(2 * esc());
+    } else {
+        for (std::size_t i = 0; i + 1 < numNonZero; ++i) {
+            _ret.push_back(input[i] - _minEl);
+        }
+        _ret.push_back(input[numNonZero-1] - _minEl + esc());
+    }
+
+    input += 64;
+}
+
+
 
 #endif // PROCESS_HPP

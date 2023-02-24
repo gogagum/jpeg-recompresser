@@ -2,10 +2,8 @@
 #include <string>
 #include <fstream>
 
-#include "archiever/include/flow/int_range_word_flow.hpp"
-#include "archiever/include/arithmetic_coder.hpp"
-#include "archiever/include/dictionary/adaptive_dictionary.hpp"
-//#include "archiever/include/dictionary/static_dictionary.hpp"
+#include <ael/arithmetic_coder.hpp>
+#include <ael/dictionary/adaptive_d_contextual_dictionary_improved.hpp>
 
 #include "lib/file_io.hpp"
 #include "lib/nj/nanojpeg.hpp"

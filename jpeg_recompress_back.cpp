@@ -2,10 +2,8 @@
 #include <string>
 #include <fstream>
 
-#include "archiever/include/word/int_range_word.hpp"
-#include "archiever/include/dictionary/adaptive_dictionary.hpp"
-#include "archiever/include/arithmetic_decoder.hpp"
-#include "archiever/include/arithmetic_decoder_decoded.hpp"
+#include <ael/arithmetic_decoder.hpp>
+#include <ael/dictionary/adaptive_d_contextual_dictionary_improved.hpp>
 
 #include "lib/file_io.hpp"
 #include "lib/jo/jo_write_jpeg.hpp"

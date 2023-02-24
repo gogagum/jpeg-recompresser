@@ -23,22 +23,18 @@ if(Boost_FOUND)
                    draft/lib/enc/jo_write_jpeg.cpp
                    draft/lib/enc/jo_write_jpeg.hpp)
     add_executable(draft-dec draft/lib/jpegdec.cpp draft/lib/dec/nanojpeg.cpp)
-
+    add_subdirectory(archiever/encoding_lib)
+    include_directories(archiever/encoding_lib/include)
     add_executable(jpeg-recompress jpeg_recompress.cpp
                    lib/nj/nanojpeg.hpp
                    lib/nj/nanojpeg.cpp
                    lib/file_io.cpp
-                   lib/magical/process.hpp
-                   archiever/include/arithmetic_coder.hpp
-                   archiever/include/arithmetic_coder_encoded.hpp
-                   archiever/include/arithmetic_coder_encoded.cpp)
+                   lib/magical/process.hpp)
 
 
     add_executable(jpeg_recompress_back jpeg_recompress_back.cpp
                    lib/file_io.cpp
                    lib/magical/process_back.cpp
-                   archiever/include/arithmetic_decoder_decoded.hpp
-                   archiever/include/arithmetic_decoder_decoded.cpp
                    lib/jo/jo_write_jpeg.cpp)
 
     install(TARGETS jpeg-recompress jpeg_recompress_back

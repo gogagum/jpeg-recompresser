@@ -59,7 +59,7 @@ Process<blockSize>::Process(std::vector<int>&& els) : _els(std::move(els)) {
     auto [minIter, maxIter] = std::minmax_element(_els.begin(), _els.end());
     _minEl = *minIter;
     _maxEl = *maxIter;
-    assert(_els.size() % 64 == 0);
+    assert(_els.size() % blockSize == 0);
 }
 
 //----------------------------------------------------------------------------//
@@ -95,7 +95,7 @@ Process<blockSize>::_processBlock(std::vector<int>::const_iterator& input) {
         _ret.push_back(input[numNonZero-1] - _minEl + esc());
     }
 
-    input += 64;
+    input += 63;
 }
 
 

@@ -10,7 +10,9 @@ std::ifstream openInputBinFile(std::string& filename);
 
 std::ofstream openOutPutBinFile(std::string& filename);
 
-std::vector<char> readFileBuff(std::ifstream& filename);
+std::vector<char> readWholeFile(std::ifstream& file);
+
+std::vector<std::byte> readFileBuff(std::ifstream& filename, std::size_t n);
 
 template <class T>
 T readT(std::ifstream& stream) {

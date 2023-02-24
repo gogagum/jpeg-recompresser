@@ -13,7 +13,9 @@
 class ProcessBack {
 public:
 
-    static std::vector<int> process(std::vector<int>&& els, int offset);
+    static std::vector<int> process(std::vector<int>&& els,
+                                    int offset,
+                                    std::size_t blockSize);
 
 private:
 

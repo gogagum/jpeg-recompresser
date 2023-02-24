@@ -5,6 +5,7 @@
 #include <cassert>
 
 class DCAC {
+public:
     struct Separated {
         std::vector<int> dc;
         std::vector<int> ac;
@@ -14,7 +15,7 @@ class DCAC {
         std::vector<int> ac;
         std::vector<int> dc;
 
-        assert(dcac.size() & 64 == 0);
+        assert(dcac.size() % 64 == 0);
         std::size_t numBlocks = dcac.size();
 
         for (std::size_t i = 0; i < dcac.size(); i += 64) {

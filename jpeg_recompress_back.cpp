@@ -10,6 +10,7 @@
 #include "lib/file_io.hpp"
 #include "lib/jo/jo_write_jpeg.hpp"
 #include "lib/magical/process_back.hpp"
+#include "lib/magical/dc_ac.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -32,66 +33,37 @@ int main(int argc, char* argv[]) {
         int ncomp = jrec::io::readT<int>(inCompressed);
         int seqOffset = jrec::io::readT<int>(inCompressed);
 
-        std::uint16_t numBits = jrec::io::deserializeNumBits(inCompressed);
+        //std::uint16_t numBits = jrec::io::deserializeNumBits(inCompressed);
 
-        inCompressed.seekg(0, std::ios::beg);
+        using Word = ga::w::IntegerWord<int, 0, 16>;
+        using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
+        using Decoder = ga::ArithmeticDecoder<Word, Dict>;
 
-        auto inBuff = jrec::io::readFileBuff(inCompressed);
+        int acSize = jrec::io::readT<int>(inCompressed);
+        auto acBuff = jrec::io::readFileBuff(inCompressed, acSize);
+        auto acDecoder = Decoder(ga::ArithmeticDecoderDecoded(std::move(acBuff)));
 
-        std::size_t offset = 5 * sizeof(int) + sizeof(std::uint16_t) /* numBits */;
-
-        std::vector<std::byte> inBufCut;
-        inBufCut.resize(inBuff.size() - offset);
-        std::memcpy(inBufCut.data(), inBuff.data() + offset, inBufCut.size());
-
-        std::vector<int> blocks;
-
-        if (numBits == 6) {
-            using Word = ga::w::IntegerWord<int, 0, 6>;
-            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
-            using Decoder = ga::ArithmeticDecoder<Word, Dict>;
-            auto decoded = ga::ArithmeticDecoderDecoded(std::move(inBufCut));
-            auto decoder = Decoder(std::move(decoded));
-            auto syms = decoder.decode().syms;
-            for (auto w: syms) {
-                blocks.push_back(w.getValue());
-            }
-        } else if (numBits == 7) {
-            using Word = ga::w::IntegerWord<int, 0, 7>;
-            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
-            using Decoder = ga::ArithmeticDecoder<Word, Dict>;
-            auto decoded = ga::ArithmeticDecoderDecoded(std::move(inBufCut));
-            auto decoder = Decoder(std::move(decoded));
-            auto syms = decoder.decode().syms;
-            for (auto w: syms) {
-                blocks.push_back(w.getValue());
-            }
-        } else if (numBits == 8) {
-            using Word = ga::w::IntegerWord<int, 0, 8>;
-            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
-            using Decoder = ga::ArithmeticDecoder<Word, Dict>;
-            auto decoded = ga::ArithmeticDecoderDecoded(std::move(inBufCut));
-            auto decoder = Decoder(std::move(decoded));
-            auto syms = decoder.decode().syms;
-            for (auto w: syms) {
-                blocks.push_back(w.getValue());
-            }
-        } else {
-            using Word = ga::w::IntegerWord<int, 0, 16>;
-            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
-            using Decoder = ga::ArithmeticDecoder<Word, Dict>;
-            auto decoded = ga::ArithmeticDecoderDecoded(std::move(inBufCut));
-            auto decoder = Decoder(std::move(decoded));
-            auto syms = decoder.decode().syms;
-            for (auto w: syms) {
-                blocks.push_back(w.getValue());
-            }
+        auto acSyms = acDecoder.decode().syms;
+        std::vector<int> acProcessed;
+        for (auto sym: acSyms) {
+            acProcessed.push_back(sym.getValue());
         }
 
-        blocks = ProcessBack::process(std::move(blocks), seqOffset);
-        auto blocksIter = blocks.begin();
+        auto ac = ProcessBack::process(std::move(acProcessed), seqOffset, 63);
 
-        jo_write_jpg(blocksIter, outJpeg, width, height, ncomp, imageQuality);
+        int dcSize = jrec::io::readT<int>(inCompressed);
+        auto dcBuff = jrec::io::readFileBuff(inCompressed, dcSize);
+        auto dcDecoder = Decoder(ga::ArithmeticDecoderDecoded(std::move(dcBuff)));
+
+        auto dcSyms = dcDecoder.decode().syms;
+        std::vector<int> dc;
+        for (auto sym: dcSyms) {
+            dc.push_back(sym.getValue());
+        }
+
+        auto acdc = DCAC::join(dc, ac);
+        auto iter = acdc.begin();
+        jo_write_jpg(iter, outJpeg, width, height, ncomp, imageQuality);
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;
         return 1;

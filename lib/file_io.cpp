@@ -25,7 +25,7 @@ std::ofstream openOutPutBinFile(std::string& filename){
 }
 
 //----------------------------------------------------------------------------//
-std::vector<char> readFileBuff(std::ifstream& file) {
+std::vector<char> readWholeFile(std::ifstream& file) {
     // Stop eating new lines in binary mode!!!
     file.unsetf(std::ios::skipws);
 
@@ -42,9 +42,18 @@ std::vector<char> readFileBuff(std::ifstream& file) {
 
     // read the data:
     buff.insert(buff.begin(),
-               std::istream_iterator<char>(file),
-               std::istream_iterator<char>());
+                std::istream_iterator<char>(file),
+                std::istream_iterator<char>());
+
     return buff;
+}
+
+//----------------------------------------------------------------------------//
+std::vector<std::byte> readFileBuff(std::ifstream& file, std::size_t n) {
+    std::vector<std::byte> ret(n);
+    file.read(reinterpret_cast<char*>(ret.data()), n);
+
+    return ret;
 }
 
 //----------------------------------------------------------------------------//

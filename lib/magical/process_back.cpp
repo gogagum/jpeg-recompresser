@@ -2,8 +2,8 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
-std::vector<int> ProcessBack::process(std::vector<int>&& els, int offset) {
-    auto processor = ProcessBack(std::move(els), offset, 64);
+std::vector<int> ProcessBack::process(std::vector<int>&& els, int offset, std::size_t blockSize) {
+    auto processor = ProcessBack(std::move(els), offset, blockSize);
     return processor._process();
 }
 

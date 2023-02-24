@@ -10,6 +10,7 @@
 #include "lib/file_io.hpp"
 #include "lib/nj/nanojpeg.hpp"
 #include "lib/magical/process.hpp"
+#include "lib/magical/dc_ac.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -27,7 +28,7 @@ int main(int argc, char* argv[]) {
         auto inJpeg = jrec::io::openInputBinFile(inFileName);
         auto outCompressed = jrec::io::openOutPutBinFile(outFileName);
 
-        auto buff = jrec::io::readFileBuff(inJpeg);
+        auto buff = jrec::io::readWholeFile(inJpeg);
 
         std::vector<int> blocks;
 
@@ -38,69 +39,31 @@ int main(int argc, char* argv[]) {
         int height = nj.getHeight();
         int ncomp = nj.ncomp;
 
-        auto [offset, blocksProcessed] = Process<64>::process(std::move(blocks));
+        auto [dc, ac] = DCAC::separate(blocks);
 
-        for (auto comprIt = blocksProcessed.begin(); comprIt < blocksProcessed.begin() + 100; ++comprIt) {
-            std::cout << *comprIt << " ";
-        }
-
-        std::cout << std::endl;
-        std::cout << offset << std::endl;
+        auto [acOffset, acProcessed] = Process<63>::process(std::move(ac));
 
         jrec::io::writeT(outCompressed, imageQuality);
         jrec::io::writeT(outCompressed, width);
         jrec::io::writeT(outCompressed, height);
         jrec::io::writeT(outCompressed, ncomp);
-        jrec::io::writeT(outCompressed, offset);
 
-        int maxBlock = *std::max_element(blocksProcessed.begin(), blocksProcessed.end());
+        using Flow = ga::fl::IntegerWordFlow<int, 0, 16>;
+        using Word = ga::w::IntegerWord<int, 0, 16>;
+        using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
+        using Coder = ga::ArithmeticCoder<Flow, Dict>;
 
+        auto dcCoder = Coder(Flow(std::move(dc)));
+        auto dcEncoded = dcCoder.encode();
 
-        if (maxBlock < 64) {
-            using Flow = ga::fl::IntegerWordFlow<int, 0, 6>;
-            using Word = ga::w::IntegerWord<int, 0, 6>;
-            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
-            using Coder = ga::ArithmeticCoder<Flow, Dict>;
+        auto acCoder = Coder(Flow(std::move(acProcessed)));
+        auto acEncoded = acCoder.encode();
 
-            auto flow = Flow(std::move(blocksProcessed));
-            auto coder = Coder(std::move(flow));
-            auto encoded = coder.encode();
-
-            outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
-        } else if (maxBlock < 128) {
-            using Flow = ga::fl::IntegerWordFlow<int, 0, 7>;
-            using Word = ga::w::IntegerWord<int, 0, 7>;
-            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
-            using Coder = ga::ArithmeticCoder<Flow, Dict>;
-
-            auto flow = Flow(std::move(blocksProcessed));
-            auto coder = Coder(std::move(flow));
-            auto encoded = coder.encode();
-
-            outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
-        } else if (maxBlock < 256) {
-            using Flow = ga::fl::IntegerWordFlow<int, 0, 8>;
-            using Word = ga::w::IntegerWord<int, 0, 8>;
-            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
-            using Coder = ga::ArithmeticCoder<Flow, Dict>;
-
-            auto flow = Flow(std::move(blocksProcessed));
-            auto coder = Coder(std::move(flow));
-            auto encoded = coder.encode();
-
-            outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
-        } else {
-            using Flow = ga::fl::IntegerWordFlow<int, 0, 16>;
-            using Word = ga::w::IntegerWord<int, 0, 16>;
-            using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
-            using Coder = ga::ArithmeticCoder<Flow, Dict>;
-
-            auto flow = Flow(std::move(blocksProcessed));
-            auto coder = Coder(std::move(flow));
-            auto encoded = coder.encode();
-
-            outCompressed.write(reinterpret_cast<const char*>(encoded.data()), encoded.bytesSize());
-        }
+        jrec::io::writeT<int>(outCompressed, dcEncoded.bytesSize());
+        outCompressed.write(reinterpret_cast<const char*>(dcEncoded.data()), dcEncoded.bytesSize());
+        jrec::io::writeT<int>(outCompressed, acEncoded.bytesSize());
+        jrec::io::writeT(outCompressed, acOffset);
+        outCompressed.write(reinterpret_cast<const char*>(acEncoded.data()), acEncoded.bytesSize());
 
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;

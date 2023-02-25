@@ -114,15 +114,17 @@ void nj_context_t::decodeDRI() {
 //----------------------------------------------------------------------------//
 void nj_context_t::upsample(nj_component_t* c) {
     int x, y, xshift = 0, yshift = 0;
-
-    unsigned char *lin, *lout;
+    unsigned char *lout;
     while (c->width < nj.width) { c->width <<= 1; ++xshift; }
     while (c->height < nj.height) { c->height <<= 1; ++yshift; }
-    auto out = std::vector<unsigned char>(c->width * c->height);
+    auto out = std::vector<unsigned char>(c->width * c->height); 
+    auto lin = c->pixels.data();
     lout = out.data();
     for (y = 0;  y < c->height;  ++y) {
-        for (x = 0;  x < c->width;  ++x)
+        lin = &c->pixels[(y >> yshift) * c->stride];
+        for (x = 0;  x < c->width;  ++x) {
             lout[x] = lin[x >> xshift];
+        }
         lout += c->width;
     }
     c->stride = c->width;
@@ -136,7 +138,6 @@ unsigned short nj_context_t::decode16(const unsigned char *pos) {
 
 //----------------------------------------------------------------------------//
 void nj_context_t::upsampleH(nj_component_t* c) {
-    const int xmax = c->width - 3;
     unsigned char *lin, *lout;
     int x, y;
     auto out = std::vector<unsigned char>((c->width * c->height) << 1);
@@ -146,7 +147,7 @@ void nj_context_t::upsampleH(nj_component_t* c) {
         lout[0] = CF(CF2A * lin[0] + CF2B * lin[1]);
         lout[1] = CF(CF3X * lin[0] + CF3Y * lin[1] + CF3Z * lin[2]);
         lout[2] = CF(CF3A * lin[0] + CF3B * lin[1] + CF3C * lin[2]);
-        for (x = 0;  x < xmax;  ++x) {
+        for (x = 0;  x + 3 < c->width;  ++x) {
             lout[(x << 1) + 3] = CF(CF4A * lin[x] + CF4B * lin[x + 1] + CF4C * lin[x + 2] + CF4D * lin[x + 3]);
             lout[(x << 1) + 4] = CF(CF4D * lin[x] + CF4C * lin[x + 1] + CF4B * lin[x + 2] + CF4A * lin[x + 3]);
         }
@@ -157,6 +158,34 @@ void nj_context_t::upsampleH(nj_component_t* c) {
         lout[-1] = CF(CF2A * lin[-1] + CF2B * lin[-2]);
     }
     c->width <<= 1;
+    c->stride = c->width;
+    c->pixels = out;
+}
+
+//----------------------------------------------------------------------------//
+void nj_context_t::upsampleV(nj_component_t* c) {
+    const int s1 = c->stride, s2 = s1 + s1;
+    unsigned char *cin, *cout;
+    int x, y;
+    auto out = std::vector<unsigned char>((c->width * c->height) << 1);
+    for (x = 0; x < c->width; ++x) {
+        cin = &c->pixels[x];
+        cout = &out[x];
+        *cout = CF(CF2A * cin[0] + CF2B * cin[s1]);                   cout += c->width;
+        *cout = CF(CF3X * cin[0] + CF3Y * cin[s1] + CF3Z * cin[s2]);  cout += c->width;
+        *cout = CF(CF3A * cin[0] + CF3B * cin[s1] + CF3C * cin[s2]);  cout += c->width;
+        cin += s1;
+        for (y = c->height - 3; y; --y) {
+            *cout = CF(CF4A * cin[-s1] + CF4B * cin[0] + CF4C * cin[s1] + CF4D * cin[s2]);  cout += c->width;
+            *cout = CF(CF4D * cin[-s1] + CF4C * cin[0] + CF4B * cin[s1] + CF4A * cin[s2]);  cout += c->width;
+            cin += s1;
+        }
+        cin += s1;
+        *cout = CF(CF3A * cin[0] + CF3B * cin[-s1] + CF3C * cin[-s2]);  cout += c->width;
+        *cout = CF(CF3X * cin[0] + CF3Y * cin[-s1] + CF3Z * cin[-s2]);  cout += c->width;
+        *cout = CF(CF2A * cin[0] + CF2B * cin[-s1]);                    cout += c->width;
+    }
+    c->height <<= 1;
     c->stride = c->width;
     c->pixels = out;
 }
@@ -209,34 +238,6 @@ void nj_context_t::colIDCT(const int* blk, unsigned char *out, int stride)
     *out = nj.clip(((x0 - x4) >> 14) + 128);  out += stride;
     *out = nj.clip(((x3 - x2) >> 14) + 128);  out += stride;
     *out = nj.clip(((x7 - x1) >> 14) + 128);
-}
-
-//----------------------------------------------------------------------------//
-void nj_context_t::upsampleV(nj_component_t* c) {
-    const int w = c->width, s1 = c->stride, s2 = s1 + s1;
-    unsigned char *cin, *cout;
-    int x, y;
-    auto out = std::vector<unsigned char>((c->width * c->height) << 1);
-    for (x = 0;  x < w;  ++x) {
-        cin = &c->pixels[x];
-        cout = &out[x];
-        *cout = CF(CF2A * cin[0] + CF2B * cin[s1]);  cout += w;
-        *cout = CF(CF3X * cin[0] + CF3Y * cin[s1] + CF3Z * cin[s2]);  cout += w;
-        *cout = CF(CF3A * cin[0] + CF3B * cin[s1] + CF3C * cin[s2]);  cout += w;
-        cin += s1;
-        for (y = c->height - 3;  y;  --y) {
-            *cout = CF(CF4A * cin[-s1] + CF4B * cin[0] + CF4C * cin[s1] + CF4D * cin[s2]);  cout += w;
-            *cout = CF(CF4D * cin[-s1] + CF4C * cin[0] + CF4B * cin[s1] + CF4A * cin[s2]);  cout += w;
-            cin += s1;
-        }
-        cin += s1;
-        *cout = CF(CF3A * cin[0] + CF3B * cin[-s1] + CF3C * cin[-s2]);  cout += w;
-        *cout = CF(CF3X * cin[0] + CF3Y * cin[-s1] + CF3Z * cin[-s2]);  cout += w;
-        *cout = CF(CF2A * cin[0] + CF2B * cin[-s1]);
-    }
-    c->height <<= 1;
-    c->stride = c->width;
-    c->pixels = out;
 }
 
 //----------------------------------------------------------------------------//

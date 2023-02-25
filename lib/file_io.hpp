@@ -6,9 +6,9 @@
 
 namespace jrec::io {
 
-std::ifstream openInputBinFile(std::string& filename);
+std::ifstream openInputBinFile(const std::string& filename);
 
-std::ofstream openOutPutBinFile(std::string& filename);
+std::ofstream openOutPutBinFile(const std::string& filename);
 
 std::vector<char> readWholeFile(std::ifstream& file);
 

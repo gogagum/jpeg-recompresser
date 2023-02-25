@@ -34,12 +34,13 @@ typedef struct _nj_cmp {
 } nj_component_t;
 
 struct nj_context_t {
-    int getWidth() const { return width; }
-    int getHeight() const { return height; }
-    bool isColor() const { return (ncomp != 1); }
-    unsigned char* getImage() { return (ncomp == 1) ? comp[0].pixels.data() : rgb.data(); }
+    int getWidth() const     { return width; }
+    int getHeight() const    { return height; }
+    bool isColor() const     { return (ncomp != 1); }
+    unsigned char* getImage()
+    { return (ncomp == 1) ? comp[0].pixels.data() : rgb.data(); }
     int getImageSize() const { return width * height * ncomp; }
-    void byteAlign() { bufbits &= 0xF8; }
+    void byteAlign()         { bufbits &= 0xF8; }
     void skipBits(int bits);
     int showBits(int bits);
     int getBits(int bits);
@@ -384,17 +385,16 @@ static inline void njDecodeScan(OutIterT& outBlocksIter) {
 }
 
 static inline void njConvert(void) {
-    int i;
-    nj_component_t* c;
-    for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
+    for (auto [i, c] = std::make_pair(0, nj.comp); i < nj.ncomp; ++i, ++c) {
         #if NJ_CHROMA_FILTER
             while ((c->width < nj.width) || (c->height < nj.height)) {
                 if (c->width < nj.width) nj.upsampleH(c);
                 if (c->height < nj.height) nj.upsampleV(c);
             }
         #else
-            if ((c->width < nj.width) || (c->height < nj.height))
+            if ((c->width < nj.width) || (c->height < nj.height)) {
                 nj.upsample(c);
+            }
         #endif
         assert(!((c->width < nj.width) || (c->height < nj.height)));
     }
@@ -465,34 +465,6 @@ void njDecode(OutIterT& out, const void* jpeg, const int size) {
         throw std::runtime_error("Tot finished.");
     }
     njConvert();
-}
-
-static void njDecodeHeader(const void* jpegHeader, const int size) {
-    nj.pos = static_cast<const unsigned char*>(jpegHeader);
-    nj.size = size & 0x7FFFFFFF;
-    if (nj.size < 2
-            || ((nj.pos[0] ^ 0xFF) | (nj.pos[1] ^ 0xD8))) {
-        throw NotJpegException();
-    }
-    nj.skip(2);
-    while (!nj.finished) {
-        if (nj.size == 0) { break; }
-        nj.skip(2);
-        switch (nj.pos[-1]) {
-            case 0xC0: njDecodeSOF(); break;
-            case 0xC4: njDecodeDHT(); break;
-            case 0xDB: njDecodeDQT(); break;
-            case 0xDD: nj.decodeDRI(); break;
-            case 0xFE: nj.skipMarker(); break;
-            default:
-                if ((nj.pos[-1] & 0xF0) == 0xE0) {
-                    nj.skipMarker();
-                } else {
-                    throw UnsupportedException();
-                }
-        }
-    }
-    nj.finished = true;
 }
 
 #endif//_NANOJPEG_HPP

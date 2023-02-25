@@ -5,7 +5,7 @@
 namespace jrec::io {
 
 //----------------------------------------------------------------------------//
-std::ifstream openInputBinFile(std::string& filename) {
+std::ifstream openInputBinFile(const std::string& filename) {
     auto ret = std::ifstream(filename, std::ios::in | std::ios::binary);
     if (!ret.is_open()) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -14,7 +14,7 @@ std::ifstream openInputBinFile(std::string& filename) {
 }
 
 //----------------------------------------------------------------------------//
-std::ofstream openOutPutBinFile(std::string& filename){
+std::ofstream openOutPutBinFile(const std::string& filename){
     auto ret =
         std::ofstream(filename,
                       std::ios::out | std::ios::binary | std::ios::trunc);

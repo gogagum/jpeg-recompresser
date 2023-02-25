@@ -23,7 +23,7 @@ private:
 
     std::vector<int> _process();
 
-    void _process64(std::vector<int>::const_iterator& iter);
+    void _process63(std::vector<int>::const_iterator& iter);
 
 private:
     std::vector<int> _els;

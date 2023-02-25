@@ -16,12 +16,12 @@ ProcessBack::ProcessBack(std::vector<int>&& els, int offset, int blockSize)
 
 //----------------------------------------------------------------------------//
 std::vector<int> ProcessBack::_process() {
-    for (auto iter = _els.cbegin(); iter != _els.cend(); _process64(iter)) {}
+    for (auto iter = _els.cbegin(); iter != _els.cend(); _process63(iter)) {}
     return _ret;
 }
 
 //----------------------------------------------------------------------------//
-void ProcessBack::_process64(std::vector<int>::const_iterator& iter) {
+void ProcessBack::_process63(std::vector<int>::const_iterator& iter) {
     std::size_t written = 0;
     if (*iter != 2 * _esc) {
         for (; written < 64 && *iter < _esc; ++written, ++iter) {
@@ -31,5 +31,5 @@ void ProcessBack::_process64(std::vector<int>::const_iterator& iter) {
         ++written;
     }
     ++iter;
-    _ret.insert(_ret.end(), 64 - written, 0);
+    _ret.insert(_ret.end(), 63 - written, 0);
 }

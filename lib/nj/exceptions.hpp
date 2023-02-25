@@ -1,6 +1,8 @@
 #ifndef ESCEPTIONS_HPP
 #define ESCEPTIONS_HPP
 
+#include <stdexcept>
+
 ////////////////////////////////////////////////////////////////////////////////
 /// \brief The NotJpegException class
 ///

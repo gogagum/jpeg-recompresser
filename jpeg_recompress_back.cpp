@@ -1,11 +1,15 @@
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <fstream>
 
 #include <ael/arithmetic_decoder.hpp>
+#include <ael/data_parser.hpp>
 #include <ael/dictionary/adaptive_d_contextual_dictionary_improved.hpp>
 
-#include "lib/file_io.hpp"
+#include "applib/file_opener.hpp"
 #include "lib/jo/jo_write_jpeg.hpp"
 #include "lib/magical/process_back.hpp"
 #include "lib/magical/dc_ac.hpp"
@@ -14,7 +18,8 @@
 //----------------------------------------------------------------------------//
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        std::cout << "Usage: " << argv[0] << " <input-jpeg> <out-binary-file>" << std::endl;
+        std::cout << "Usage: " << std::string(argv[0])
+                  << " <input-jpeg> <out-binary-file>" << std::endl;
         return 0;
     }
 
@@ -22,46 +27,50 @@ int main(int argc, char* argv[]) {
     std::string outFileName = argv[2];
 
     try {
-        auto inCompressed = jrec::io::openInputBinFile(inFileName);
-        auto outJpeg = jrec::io::openOutPutBinFile(outFileName);
+        auto fileOpener = FileOpener(inFileName, outFileName);
+        auto inData = ael::DataParser(fileOpener.getInData());
 
-        int imageQuality = jrec::io::readT<int>(inCompressed);
-        int width = jrec::io::readT<int>(inCompressed);
-        int height = jrec::io::readT<int>(inCompressed);
-        int ncomp = jrec::io::readT<int>(inCompressed);
-        int seqOffset = jrec::io::readT<int>(inCompressed);
+        auto imageQuality = inData.takeT<std::uint32_t>();
+        auto width = inData.takeT<std::uint32_t>();
+        auto height = inData.takeT<std::uint32_t>();
+        auto nComp = inData.takeT<std::uint8_t>();
+        auto acOffset = inData.takeT<int>();
+        auto dcOffset = inData.takeT<int>();
 
-        //std::uint16_t numBits = jrec::io::deserializeNumBits(inCompressed);
+        const auto dcSize = inData.takeT<std::uint32_t>();
+        const auto dcBitsSize = inData.takeT<std::uint32_t>();
+        const auto acSize = inData.takeT<std::uint32_t>();
+        const auto acBitsSize = inData.takeT<std::uint32_t>();
 
-        using Word = ga::w::IntegerWord<int, 0, 16>;
-        using Dict = ga::dict::AdaptiveDictionary<Word, 4>;
-        using Decoder = ga::ArithmeticDecoder<Word, Dict>;
+        auto acDecoder = ael::ArithmeticDecoder();
+        auto acDict = ael::dict::AdaptiveDContextualDictionaryImproved(7, 0, 6);
 
-        int acSize = jrec::io::readT<int>(inCompressed);
-        auto acBuff = jrec::io::readFileBuff(inCompressed, acSize);
-        auto acDecoder = Decoder(ga::ArithmeticDecoderDecoded(std::move(acBuff)));
+        auto dcDecoder = ael::ArithmeticDecoder();
+        auto dcDict = ael::dict::AdaptiveDContextualDictionaryImproved(7, 0, 6);
 
-        auto acSyms = acDecoder.decode().syms;
+        std::vector<int> dcProcessed;
+        dcDecoder.decode(inData, dcDict, std::back_inserter(dcProcessed),
+                         dcSize, dcBitsSize);
+
         std::vector<int> acProcessed;
-        for (auto sym: acSyms) {
-            acProcessed.push_back(sym.getValue());
-        }
+        acDecoder.decode(inData, acDict, std::back_inserter(acProcessed),
+                         acSize, acBitsSize);
+        auto ac = ProcessBack::process(std::move(acProcessed), acOffset, 63);
 
-        auto ac = ProcessBack::process(std::move(acProcessed), seqOffset, 63);
-
-        int dcSize = jrec::io::readT<int>(inCompressed);
-        auto dcBuff = jrec::io::readFileBuff(inCompressed, dcSize);
-        auto dcDecoder = Decoder(ga::ArithmeticDecoderDecoded(std::move(dcBuff)));
-
-        auto dcSyms = dcDecoder.decode().syms;
         std::vector<int> dc;
-        for (auto sym: dcSyms) {
-            dc.push_back(sym.getValue());
-        }
+        std::transform(dcProcessed.begin(), dcProcessed.end(),
+                       std::back_inserter(dc),
+                       [dcOffset](auto num) { 
+                           return num + dcOffset;
+                       });
+
+        std::cout << dc.size() << " " << ac.size() << std::endl;
+        std::cout << dcSize << " " << acSize << std::endl;
 
         auto acdc = DCAC::join(dc, ac);
         auto iter = acdc.begin();
-        jo_write_jpg(iter, outJpeg, width, height, ncomp, imageQuality);
+        jo_write_jpg(iter, fileOpener.getOutFileStream(), width, height,
+                     nComp, imageQuality);
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;
         return 1;

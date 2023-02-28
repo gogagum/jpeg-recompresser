@@ -3,6 +3,7 @@
 #include <bits/ranges_algobase.h>
 #include <cstddef>
 #include <cstdint>
+#include <ios>
 #include <iostream>
 #include <iterator>
 #include <optional>
@@ -11,6 +12,7 @@
 #include <ranges>
 
 #include <ael/arithmetic_coder.hpp>
+#include <ael/dictionary/adaptive_d_dictionary.hpp>
 #include <ael/dictionary/adaptive_d_contextual_dictionary_improved.hpp>
 #include <ael/byte_data_constructor.hpp>
 
@@ -19,9 +21,10 @@
 
 #include <boost/range/adaptor/transformed.hpp>
 
+#include "ael/dictionary/adaptive_d_contextual_dictionary_improved.hpp"
 #include "lib/file_io.hpp"
-#include "lib/nj/nanojpeg.hpp"
 #include "lib/magical/process.hpp"
+#include "lib/nj/nanojpeg.hpp"
 #include "lib/magical/dc_ac.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -55,12 +58,10 @@ int main(int argc, char* argv[]) {
 
         auto [dc, ac] = DCAC::separate(blocks);
 
-        auto acOffset = *std::ranges::min_element(ac);
-        auto acTransformed = boost::adaptors::transform(
-            ac, [acOffset](auto num) { return num - acOffset; } 
-        );
+        auto [acProcessed, acLengthes, acOffset, acRng] = AcTransform::process(ac, 63);
 
         auto dcOffset = *std::ranges::min_element(dc);
+        auto dcMax = *std::ranges::max_element(dc);
         auto dcTransformed = boost::adaptors::transform(
             dc, [dcOffset](auto num) { return num - dcOffset; }
         );
@@ -73,29 +74,58 @@ int main(int argc, char* argv[]) {
         outData.putT(dcOffset);
 
         auto dcSizePos = outData.saveSpaceForT<std::uint32_t>();
-        auto dcBitsInfoPos = outData.saveSpaceForT<std::int32_t>();
+        auto dcBitsSizePos = outData.saveSpaceForT<std::int32_t>();
         auto acSizePos = outData.saveSpaceForT<std::uint32_t>();
-        auto acBitsInfoPos = outData.saveSpaceForT<std::int32_t>();
+        auto acBitsSizePos = outData.saveSpaceForT<std::int32_t>();
+        auto acLengthesSizePos = outData.saveSpaceForT<std::uint32_t>();
+        auto acLengthesBitSizePos = outData.saveSpaceForT<std::uint32_t>();
 
-        auto dcDict = ael::dict::AdaptiveDContextualDictionaryImproved(7, 0, 6);
+        auto dcDict = ael::dict::AdaptiveDDictionary(dcMax - dcOffset + 1);
         auto dcCoder = ael::ArithmeticCoder();
         
         auto [dcCnt, dcBitsCnt] = dcCoder.encode(dcTransformed, outData, dcDict,
                                               optout::OptOstreamRef{std::cout});
 
-        auto acDict = ael::dict::AdaptiveDContextualDictionaryImproved(7, 0, 6);
+        auto acDict = ael::dict::AdaptiveDContextualDictionaryImproved(8, 1, 8);
+        auto acLengthesDict = ael::dict::AdaptiveDDictionary(64);
         auto acCoder = ael::ArithmeticCoder();
         
-        auto [acCnt, acBitsCnt] = acCoder.encode(acTransformed, outData, acDict,
-                                              optout::OptOstreamRef(std::cout));
+        auto [acCnt, acBitsCnt] = 
+            acCoder.encode(
+                acProcessed, outData, acDict, optout::OptOstreamRef(std::cout));
 
-        outData.putTToPosition<std::uint32_t>(dcBitsCnt, dcBitsInfoPos);
-        outData.putTToPosition<std::uint32_t>(acBitsCnt, acBitsInfoPos);
+        auto [acLengthesCnt, acLengthesBitsCnt] =
+            acCoder.encode(
+                acLengthes, outData, acLengthesDict, optout::OptOstreamRef(std::cout));
+
+        outData.putTToPosition<std::uint32_t>(dcBitsCnt, dcBitsSizePos);
+        outData.putTToPosition<std::uint32_t>(acBitsCnt, acBitsSizePos);
 
         outData.putTToPosition<std::uint32_t>(acCnt, acSizePos);
         outData.putTToPosition<std::uint32_t>(dcCnt, dcSizePos);
 
+        outData.putTToPosition<std::uint32_t>(acLengthesCnt, acLengthesSizePos);
+        outData.putTToPosition<std::uint32_t>(acLengthesBitsCnt, acLengthesBitSizePos);
+
         outCompressed.write(outData.data<const char>(), outData.size());
+
+        //std::ofstream acsOs("acs.txt", std::ios::out | std::ios::trunc);
+        //for (auto acI : acProcessed) {
+        //    acsOs << acI << std::endl;
+        //}
+
+        //std::ofstream acsLengthesOs("acs_lengths.txt", std::ios::out | std::ios::trunc);
+        //for (auto acLength : acLengthes) {
+        //    acsLengthesOs << acLength << std::endl;
+        //}
+
+        //std::ofstream dcsOs("dcs.txt", std::ios::out | std::ios::trunc);
+        //for (auto dc : dcTransformed) {
+        //    dcsOs << dc << std::endl;
+        //}
+
+        std::cout << acBitsCnt << " " << acLengthesBitsCnt << " " << dcBitsCnt << std::endl;
+
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;
         return 1;

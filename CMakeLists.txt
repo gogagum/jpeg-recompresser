@@ -35,12 +35,11 @@ if(Boost_FOUND)
                    lib/nj/nanojpeg.hpp
                    lib/nj/nanojpeg.cpp
                    lib/file_io.cpp
-                   lib/magical/process.hpp)
+                   lib/magical/process.cpp)
     target_link_libraries(jpeg-recompress archievers-applib arithmetic-encoding-lib)
 
     add_executable(jpeg-recompress-back jpeg_recompress_back.cpp
                    lib/file_io.cpp
-                   lib/magical/process_back.cpp
                    lib/jo/jo_write_jpeg.cpp)
     target_link_libraries(jpeg-recompress-back archievers-applib arithmetic-encoding-lib)
 endif()

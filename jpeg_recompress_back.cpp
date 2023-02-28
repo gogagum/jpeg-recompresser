@@ -7,11 +7,10 @@
 
 #include <ael/arithmetic_decoder.hpp>
 #include <ael/data_parser.hpp>
-#include <ael/dictionary/adaptive_d_contextual_dictionary_improved.hpp>
+#include <ael/dictionary/adaptive_d_dictionary.hpp>
 
 #include "applib/file_opener.hpp"
 #include "lib/jo/jo_write_jpeg.hpp"
-#include "lib/magical/process_back.hpp"
 #include "lib/magical/dc_ac.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -43,19 +42,14 @@ int main(int argc, char* argv[]) {
         const auto acBitsSize = inData.takeT<std::uint32_t>();
 
         auto acDecoder = ael::ArithmeticDecoder();
-        auto acDict = ael::dict::AdaptiveDContextualDictionaryImproved(7, 0, 6);
+        auto acDict = ael::dict::AdaptiveDDictionary(256);
 
         auto dcDecoder = ael::ArithmeticDecoder();
-        auto dcDict = ael::dict::AdaptiveDContextualDictionaryImproved(7, 0, 6);
+        auto dcDict = ael::dict::AdaptiveDDictionary(256);
 
         std::vector<int> dcProcessed;
         dcDecoder.decode(inData, dcDict, std::back_inserter(dcProcessed),
                          dcSize, dcBitsSize);
-
-        std::vector<int> acProcessed;
-        acDecoder.decode(inData, acDict, std::back_inserter(acProcessed),
-                         acSize, acBitsSize);
-        auto ac = ProcessBack::process(std::move(acProcessed), acOffset, 63);
 
         std::vector<int> dc;
         std::transform(dcProcessed.begin(), dcProcessed.end(),
@@ -64,6 +58,17 @@ int main(int argc, char* argv[]) {
                            return num + dcOffset;
                        });
 
+        std::vector<int> acProcessed;
+        acDecoder.decode(inData, acDict, std::back_inserter(acProcessed),
+                         acSize, acBitsSize);
+        
+        std::vector<int> ac;
+        std::transform(acProcessed.begin(), acProcessed.end(),
+                       std::back_inserter(ac),
+                       [acOffset](auto num) {
+                           return num + acOffset; 
+                       });
+        
         std::cout << dc.size() << " " << ac.size() << std::endl;
         std::cout << dcSize << " " << acSize << std::endl;
 

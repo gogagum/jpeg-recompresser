@@ -356,12 +356,14 @@ static inline void njDecodeScan(OutIterT& outBlocksIter) {
     }
     nj.skip(nj.length);
     for (mbx = mby = 0;;) {
-        for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c)
-            for (sby = 0;  sby < c->ssy;  ++sby)
+        for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
+            for (sby = 0;  sby < c->ssy;  ++sby) {
                 for (sbx = 0;  sbx < c->ssx;  ++sbx) {
                     auto* out = &c->pixels[((mby * c->ssy + sby) * c->stride + mbx * c->ssx + sbx) << 3];
                     njDecodeBlock(outBlocksIter,c, out);
                 }
+            }
+        }
         if (++mbx >= nj.mbwidth) {
             mbx = 0;
             if (++mby >= nj.mbheight) {

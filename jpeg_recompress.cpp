@@ -13,7 +13,7 @@
 
 #include <ael/arithmetic_coder.hpp>
 #include <ael/dictionary/adaptive_d_dictionary.hpp>
-#include <ael/dictionary/adaptive_d_contextual_dictionary_improved.hpp>
+#include <ael/dictionary/ppmd_dictionary.hpp>
 #include <ael/byte_data_constructor.hpp>
 
 #include <applib/file_opener.hpp>
@@ -21,7 +21,6 @@
 
 #include <boost/range/adaptor/transformed.hpp>
 
-#include "ael/dictionary/adaptive_d_contextual_dictionary_improved.hpp"
 #include "lib/file_io.hpp"
 #include "lib/magical/process.hpp"
 #include "lib/nj/nanojpeg.hpp"
@@ -52,6 +51,8 @@ int main(int argc, char* argv[]) {
         auto blocksInserter = std::back_inserter(blocks);
         njDecode(blocksInserter, buff.data(), buff.size());
 
+        std::cout << blocks.size() << std::endl;
+
         auto width = std::uint32_t(nj.getWidth());
         auto height = std::uint32_t(nj.getHeight());
         auto nComp = std::uint8_t(nj.ncomp);
@@ -80,14 +81,14 @@ int main(int argc, char* argv[]) {
         auto acLengthesSizePos = outData.saveSpaceForT<std::uint32_t>();
         auto acLengthesBitSizePos = outData.saveSpaceForT<std::uint32_t>();
 
-        auto dcDict = ael::dict::AdaptiveDDictionary(dcMax - dcOffset + 1);
+        auto dcDict = ael::dict::PPMDDictionary(dcMax - dcOffset + 1, 1);
         auto dcCoder = ael::ArithmeticCoder();
         
         auto [dcCnt, dcBitsCnt] = dcCoder.encode(dcTransformed, outData, dcDict,
                                               optout::OptOstreamRef{std::cout});
 
-        auto acDict = ael::dict::AdaptiveDContextualDictionaryImproved(8, 1, 8);
-        auto acLengthesDict = ael::dict::AdaptiveDDictionary(64);
+        auto acDict = ael::dict::PPMDDictionary(acRng, 1);
+        auto acLengthesDict = ael::dict::PPMDDictionary(64, 1);
         auto acCoder = ael::ArithmeticCoder();
         
         auto [acCnt, acBitsCnt] = 
@@ -109,21 +110,22 @@ int main(int argc, char* argv[]) {
 
         outCompressed.write(outData.data<const char>(), outData.size());
 
-        //std::ofstream acsOs("acs.txt", std::ios::out | std::ios::trunc);
-        //for (auto acI : acProcessed) {
-        //    acsOs << acI << std::endl;
-        //}
+        std::ofstream acsOs("acs.txt", std::ios::out | std::ios::trunc);
+        for (auto acI : acProcessed) {
+            acsOs << acI << std::endl;
+        }
 
-        //std::ofstream acsLengthesOs("acs_lengths.txt", std::ios::out | std::ios::trunc);
-        //for (auto acLength : acLengthes) {
-        //    acsLengthesOs << acLength << std::endl;
-        //}
+        std::ofstream acsLengthesOs("acs_lengths.txt", std::ios::out | std::ios::trunc);
+        for (auto acLength : acLengthes) {
+            acsLengthesOs << acLength << std::endl;
+        }
 
-        //std::ofstream dcsOs("dcs.txt", std::ios::out | std::ios::trunc);
-        //for (auto dc : dcTransformed) {
-        //    dcsOs << dc << std::endl;
-        //}
+        std::ofstream dcsOs("dcs.txt", std::ios::out | std::ios::trunc);
+        for (auto dc : dcTransformed) {
+            dcsOs << dc << std::endl;
+        }
 
+        std::cout << acRng << std::endl;
         std::cout << acBitsCnt << " " << acLengthesBitsCnt << " " << dcBitsCnt << std::endl;
 
     } catch (std::runtime_error& err) {

@@ -80,8 +80,8 @@ static nj_context_t nj;
 // Parameters:
 //   jpeg = The pointer to the memory dump.
 //   size = The size of the JPEG file.
-template <std::output_iterator<int> OutIter>
-void njDecode(OutIter& out, const void* jpeg, const int size);
+template <class ContainerT>
+void njDecode(ContainerT& out, const void* jpeg, const int size);
 
 constexpr static int W1 = 2841;
 constexpr static int W2 = 2676;
@@ -291,7 +291,7 @@ static int njGetVLC(nj_vlc_code_t* vlc, unsigned char* code) {
 
 template <std::output_iterator<int> OutIterT>
 static inline void
-njDecodeBlock(OutIterT& outBlocks, nj_component_t* c, unsigned char* out)
+njDecodeBlock(OutIterT outBlocks, nj_component_t* c, unsigned char* out)
 {
     unsigned char code = 0;
     int coef = 0;
@@ -329,8 +329,8 @@ njDecodeBlock(OutIterT& outBlocks, nj_component_t* c, unsigned char* out)
     }
 }
 
-template <std::output_iterator<int> OutIterT>
-static inline void njDecodeScan(OutIterT& outBlocksIter) {
+template <class ContainerT>
+static inline void njDecodeScan(ContainerT& container) {
     int i, mbx, mby, sbx, sby;
     int rstcount = nj.rstinterval, nextrst = 0;
     nj_component_t* c;
@@ -355,12 +355,13 @@ static inline void njDecodeScan(OutIterT& outBlocksIter) {
         throw UnsupportedException();
     }
     nj.skip(nj.length);
+    container.resize(nj.ncomp);
     for (mbx = mby = 0;;) {
         for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
             for (sby = 0;  sby < c->ssy;  ++sby) {
                 for (sbx = 0;  sbx < c->ssx;  ++sbx) {
                     auto* out = &c->pixels[((mby * c->ssy + sby) * c->stride + mbx * c->ssx + sbx) << 3];
-                    njDecodeBlock(outBlocksIter,c, out);
+                    njDecodeBlock(std::back_inserter(container[i]), c, out);
                 }
             }
         }
@@ -434,8 +435,8 @@ static inline void njConvert(void) {
     }
 }
 
-template <std::output_iterator<int> OutIterT>
-void njDecode(OutIterT& out, const void* jpeg, const int size) {
+template <class ContainerT>
+void njDecode(ContainerT& out, const void* jpeg, const int size) {
     nj.pos = static_cast<const unsigned char*>(jpeg);
     nj.size = size & 0x7FFFFFFF;
     if (nj.size < 2

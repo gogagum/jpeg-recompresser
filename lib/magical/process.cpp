@@ -8,26 +8,45 @@
 #include <boost/range/adaptor/transformed.hpp>
 
 ////////////////////////////////////////////////////////////////////////////////
-//----------------------------------------------------------------------------//
-auto AcTransform::process(const std::vector<int>& acs, std::size_t blockSize) -> Ret {
+auto AcTransform::process(const std::vector<std::int32_t>& acs, std::size_t blockSize) -> Ret {
     assert(acs.size() % blockSize == 0);
     auto ret = Ret();
-    auto [minIter, maxIter] = std::ranges::minmax_element(acs);
-    ret.offset = *minIter;
-    ret.rng = *maxIter - *minIter + 1;
     for (auto inIter = acs.begin(); inIter < acs.end(); inIter += blockSize) {
         auto endIter = inIter + blockSize;
-        while (inIter + 1 < endIter && endIter[-1] == 0) {
+        while (inIter < endIter && endIter[-1] == 0) {
             --endIter;
         }
         ret.lengthes.push_back(endIter - inIter);
-        std::transform(inIter, endIter, std::back_inserter(ret.processed),
-                       [&ret](auto num) { return num - ret.offset; });
+        std::copy(inIter, endIter, std::back_inserter(ret.processed));
+    }
+    auto [minIter, maxIter] = std::ranges::minmax_element(ret.processed);
+    ret.offset = *minIter;
+    ret.rng = *maxIter - *minIter + 1;
+    for (auto& processedI: ret.processed) {
+        processedI -= ret.offset;
     }
     return ret;
 }
 
-//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+auto AcTransform::mate(std::vector<std::int32_t> &seq,
+                       std::size_t mateCount,
+                       std::int32_t maxVal) -> MateRet {
+    MateRet ret;
+    auto iter = seq.begin();
+    while (iter + mateCount < seq.end()) {
+        ret.mated.push_back(0);
+        for (auto groupIter = iter; groupIter < seq.end(); ++groupIter) {
+            *ret.mated.rbegin() *= maxVal;
+            *ret.mated.rbegin() += *groupIter;
+        }
+        iter += mateCount;
+    } 
+    std::copy(iter, seq.end(), std::back_inserter(ret.tail));
+    return ret;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 std::vector<int> AcTransform::processBack(const std::vector<std::int32_t> &acsProcessed,
                                           const std::vector<std::int32_t> &lengths,
                                           std::int32_t offset) {

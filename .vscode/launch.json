@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/build/jpeg-recompress",
-            "args": ["jpeg30/serrano30.jpg", "serrano-test", "30"],
+            "args": ["jpeg30/lena30.jpg", "lena30-test", "30"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],

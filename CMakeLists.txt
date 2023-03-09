@@ -40,7 +40,8 @@ if(Boost_FOUND)
 
     add_executable(jpeg-recompress-back jpeg_recompress_back.cpp
                    lib/file_io.cpp
-                   lib/jo/jo_write_jpeg.cpp)
+                   lib/jo/jo_write_jpeg.cpp
+                   lib/magical/process.cpp)
     target_link_libraries(jpeg-recompress-back archievers-applib arithmetic-encoding-lib)
 endif()
 

@@ -1,17 +1,25 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <iterator>
+#include <ostream>
 #include <string>
 #include <fstream>
 
+#include <boost/container/static_vector.hpp>
+
 #include <ael/arithmetic_decoder.hpp>
 #include <ael/data_parser.hpp>
-#include <ael/dictionary/adaptive_d_dictionary.hpp>
+#include <ael/dictionary/ppmd_dictionary.hpp>
 
 #include "applib/file_opener.hpp"
+#include "applib/opt_ostream.hpp"
 #include "lib/jo/jo_write_jpeg.hpp"
 #include "lib/magical/dc_ac.hpp"
+#include "lib/magical/process.hpp"
+
+namespace bc = boost::container;
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -26,6 +34,8 @@ int main(int argc, char* argv[]) {
     std::string outFileName = argv[2];
 
     try {
+        auto logStream = optout::OptOstreamRef{std::cout};
+
         auto fileOpener = FileOpener(inFileName, outFileName);
         auto inData = ael::DataParser(fileOpener.getInData());
 
@@ -33,47 +43,108 @@ int main(int argc, char* argv[]) {
         auto width = inData.takeT<std::uint32_t>();
         auto height = inData.takeT<std::uint32_t>();
         auto nComp = inData.takeT<std::uint8_t>();
-        auto acOffset = inData.takeT<int>();
-        auto dcOffset = inData.takeT<int>();
-
-        const auto dcSize = inData.takeT<std::uint32_t>();
-        const auto dcBitsSize = inData.takeT<std::uint32_t>();
-        const auto acSize = inData.takeT<std::uint32_t>();
-        const auto acBitsSize = inData.takeT<std::uint32_t>();
-
-        auto acDecoder = ael::ArithmeticDecoder();
-        auto acDict = ael::dict::AdaptiveDDictionary(256);
-
-        auto dcDecoder = ael::ArithmeticDecoder();
-        auto dcDict = ael::dict::AdaptiveDDictionary(256);
-
-        std::vector<int> dcProcessed;
-        dcDecoder.decode(inData, dcDict, std::back_inserter(dcProcessed),
-                         dcSize, dcBitsSize);
-
-        std::vector<int> dc;
-        std::transform(dcProcessed.begin(), dcProcessed.end(),
-                       std::back_inserter(dc),
-                       [dcOffset](auto num) { 
-                           return num + dcOffset;
-                       });
-
-        std::vector<int> acProcessed;
-        acDecoder.decode(inData, acDict, std::back_inserter(acProcessed),
-                         acSize, acBitsSize);
         
-        std::vector<int> ac;
-        std::transform(acProcessed.begin(), acProcessed.end(),
-                       std::back_inserter(ac),
-                       [acOffset](auto num) {
-                           return num + acOffset; 
-                       });
-        
-        std::cout << dc.size() << " " << ac.size() << std::endl;
-        std::cout << dcSize << " " << acSize << std::endl;
+        bc::static_vector<std::int32_t, 8> dcOffset(nComp);
+        bc::static_vector<std::uint32_t, 8> dcRng(nComp);
+        bc::static_vector<std::int32_t, 8> acOffset(nComp);
+        bc::static_vector<std::uint32_t, 8> acRng(nComp);
+        bc::static_vector<std::uint16_t, 8> acLengthRng(nComp);
 
-        auto acdc = DCAC::join(dc, ac);
-        auto iter = acdc.begin();
+        bc::static_vector<std::uint32_t, 8> blocksCount(nComp);
+        bc::static_vector<std::uint32_t, 8> dcBitsCount(nComp);
+        bc::static_vector<std::uint32_t, 8> acCount(nComp);
+        bc::static_vector<std::uint32_t, 8> acBitsCount(nComp);
+        bc::static_vector<std::uint32_t, 8> acLengthesBitsCount(nComp);
+
+        for (std::size_t i = 0; i < nComp; ++i) {
+            logStream << "Reading channel " << i << " info: " << std::endl;
+
+            dcOffset[i] = inData.takeT<std::int32_t>();
+            logStream << "DC offset: " << dcOffset[i] << std::endl;
+            dcRng[i] = inData.takeT<std::uint32_t>();
+            logStream << "DC rng: " << dcRng[i] << std::endl;
+            acOffset[i] = inData.takeT<std::int32_t>();
+            logStream << "AC offset: " << acOffset[i] << std::endl;
+            acRng[i] = inData.takeT<std::uint32_t>();
+            logStream << "AC rng: " << acRng[i] << std::endl;
+            acLengthRng[i] = inData.takeT<std::uint8_t>();
+            logStream << "AC length rng: "
+                      << static_cast<std::size_t>(acLengthRng[i]) << std::endl;
+
+            blocksCount[i] = inData.takeT<std::uint32_t>();
+            dcBitsCount[i] = inData.takeT<std::uint32_t>();
+            acCount[i] = inData.takeT<std::uint32_t>();
+            acBitsCount[i] = inData.takeT<std::uint32_t>();
+            acLengthesBitsCount[i] = inData.takeT<std::uint32_t>();
+        }
+
+        bc::static_vector<std::vector<std::int32_t>, 8> channels(nComp);
+
+        for (std::size_t i = 0; i < nComp; ++i) {
+
+            // Decode dc
+            auto dcDict = ael::dict::PPMDDictionary(dcRng[i], 1);
+            std::vector<std::uint32_t> dcMoved;
+            ael::ArithmeticDecoder::decode(inData, dcDict,
+                                           std::back_inserter(dcMoved),
+                                           blocksCount[i],
+                                           dcBitsCount[i],
+                                           logStream);
+
+            // Decode ac
+            auto acDict = ael::dict::PPMDDictionary(acRng[i], 1);
+            std::vector<std::uint32_t> acProcessed;
+            ael::ArithmeticDecoder::decode(inData, acDict,
+                                           std::back_inserter(acProcessed),
+                                           acCount[i],
+                                           acBitsCount[i],
+                                           logStream);
+
+            // Decode ac lengthes
+            auto acLengthesDict = ael::dict::PPMDDictionary(acLengthRng[i], 1);
+            std::vector<std::uint8_t> acLengthes;
+            ael::ArithmeticDecoder::decode(inData, acLengthesDict,
+                                           std::back_inserter(acLengthes),
+                                           blocksCount[i],
+                                           acLengthesBitsCount[i],
+                                           logStream);
+
+            std::ofstream acsOs("acs-decode" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
+            for (auto acI : acProcessed) {
+                acsOs << acI << std::endl;
+            }
+
+            std::ofstream acsLengthesOs("acs_lengths-decode" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
+            for (auto acLength : acLengthes) {
+                acsLengthesOs << static_cast<std::size_t>(acLength) << std::endl;
+            }
+
+            std::ofstream dcsOs("dcs-decode" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
+            for (auto dc : dcMoved) {
+                dcsOs << dc << std::endl;
+            }
+
+            channels[i] = ACDCTransform::processBack(
+                dcMoved, dcOffset[i], acProcessed, acOffset[i], acLengthes);
+
+            std::ofstream channelOfs("channel-decode" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
+            for (auto coeff : channels[i]) {
+                channelOfs << coeff << std::endl;
+            }
+        }
+
+        std::vector<std::int32_t> channelsJoined;
+
+        for (std::size_t i = 0; i < nComp; ++i) {
+            std::copy(channels[i].begin(), channels[i].end(), std::back_inserter(channelsJoined));
+        }
+        auto iter = channelsJoined.begin();
+
+        std::ofstream dcacOfstream("dc-ac-decode.txt", std::ios::out | std::ios::trunc);
+        for (auto dc : channelsJoined) {
+            dcacOfstream << dc << std::endl;
+        }
+
         jo_write_jpg(iter, fileOpener.getOutFileStream(), width, height,
                      nComp, imageQuality);
     } catch (std::runtime_error& err) {

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <bits/ranges_algo.h>
 #include <bits/ranges_algobase.h>
 #include <cstddef>
@@ -12,6 +13,7 @@
 #include <ranges>
 
 #include <ael/arithmetic_coder.hpp>
+#include <ael/numerical_coder.hpp>
 #include <ael/dictionary/ppmd_dictionary.hpp>
 #include <ael/byte_data_constructor.hpp>
 
@@ -20,10 +22,13 @@
 
 #include <boost/range/adaptor/transformed.hpp>
 
+#include "ael/numerical_coder.hpp"
 #include "lib/file_io.hpp"
 #include "lib/magical/process.hpp"
 #include "lib/nj/nanojpeg.hpp"
 #include "lib/magical/dc_ac.hpp"
+
+namespace bc = boost::container;
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -39,6 +44,8 @@ int main(int argc, char* argv[]) {
     const auto imageQuality = std::uint32_t(std::stoul(argv[3]));
 
     try {
+        auto logStream = optout::OptOstreamRef{std::cout};
+
         auto inJpeg = jrec::io::openInputBinFile(inFileName);
         auto outCompressed = jrec::io::openOutPutBinFile(outFileName);
 
@@ -67,71 +74,115 @@ int main(int argc, char* argv[]) {
         outData.putT(height);
         outData.putT(nComp);
 
+        bc::static_vector<std::size_t, 8> dcOffsetPos(nj.ncomp);
+        bc::static_vector<std::size_t, 8> dcRngPos(nj.ncomp);
+        bc::static_vector<std::size_t, 8> acOffsetPos(nj.ncomp);
+        bc::static_vector<std::size_t, 8> acRngPos(nj.ncomp);
+        bc::static_vector<std::size_t, 8> acLengthRngPos(nj.ncomp);
+
+        bc::static_vector<std::size_t, 8> blocksCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 8> dcBitsCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 8> acCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 8> acBitsCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 8> acLengthesBitsCountPos(nj.ncomp);
+
         for (std::size_t i = 0; i < nj.ncomp; ++i) {
-            auto [dc, ac] = DCAC::separate(channels[i]);
+            dcOffsetPos[i] = outData.saveSpaceForT<std::int32_t>();
+            dcRngPos[i] = outData.saveSpaceForT<std::uint32_t>();
+            acOffsetPos[i] = outData.saveSpaceForT<std::int32_t>();
+            acRngPos[i] = outData.saveSpaceForT<std::uint32_t>();
+            acLengthRngPos[i] = outData.saveSpaceForT<std::uint8_t>();
 
-            auto [acProcessed, acLengthes, acOffset, acRng] = AcTransform::process(ac, 63);
+            blocksCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
+            dcBitsCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
+            acCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
+            acBitsCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
+            acLengthesBitsCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
+        }
 
-            auto dcOffset = *std::ranges::min_element(dc);
-            auto dcMax = *std::ranges::max_element(dc);
-            auto dcTransformed = boost::adaptors::transform(
-                dc, [dcOffset](auto num) { return num - dcOffset; }
-            );
+        for (std::size_t i = 0; i < nj.ncomp; ++i) {
 
-            outData.putT(acOffset);
-            outData.putT(dcOffset);
+            std::ofstream channelOfs("channel" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
+            for (auto coeff : channels[i]) {
+                channelOfs << coeff << std::endl;
+            }
 
-            //auto dcSizePos = outData.saveSpaceForT<std::uint32_t>();
-            //auto dcBitsSizePos = outData.saveSpaceForT<std::int32_t>();
-            //auto acSizePos = outData.saveSpaceForT<std::uint32_t>();
-            //auto acBitsSizePos = outData.saveSpaceForT<std::int32_t>();
-            //auto acLengthesSizePos = outData.saveSpaceForT<std::uint32_t>();
-            //auto acLengthesBitSizePos = outData.saveSpaceForT<std::uint32_t>();
+            /**
+             * dcMoved
+             * dcOffset
+             * dcRng
+             * acMoved
+             * acOffset
+             * acRng
+             * acLengthes
+             * acLengthesRng
+             */
+            auto processed = ACDCTransform::process(channels[i]);
 
-            auto dcDict = ael::dict::PPMDDictionary(dcMax - dcOffset + 1, 1);
-        
-            auto [dcCnt, dcBitsCnt] =
-                ael::ArithmeticCoder::encode(dcTransformed, outData, dcDict,
-                                             optout::OptOstreamRef{std::cout});
+            outData.putTToPosition<std::int32_t>(processed.dcOffset, dcOffsetPos[i]);
+            outData.putTToPosition<std::uint32_t>(processed.dcRng, dcRngPos[i]);
+            outData.putTToPosition<std::int32_t>(processed.acOffset, acOffsetPos[i]);
+            outData.putTToPosition<std::uint32_t>(processed.acRng, acRngPos[i]);
+            outData.putTToPosition<std::uint8_t>(processed.acLengthesRng, acLengthRngPos[i]);
 
-            auto acLengthesRng = *std::ranges::max_element(acLengthes);
+            assert(processed.acLengthes.size() == processed.dc.size()
+                   && "AC lengthes count is not equal with DCs count.");
+            outData.putTToPosition<std::uint32_t>(processed.dc.size(), blocksCountPos[i]);
+            outData.putTToPosition<std::uint32_t>(processed.acProcessed.size(), acCountPos[i]);
 
-            auto acDict = ael::dict::PPMDDictionary(acRng, 1);
-            auto acLengthesDict = ael::dict::PPMDDictionary(acLengthesRng + 1, 1);
-        
-            auto [acCnt, acBitsCnt] = 
+            // Encode dc.
+            auto dcDict = ael::dict::PPMDDictionary(processed.dcRng, 1);
+            auto [dcCount, dcBitsCount] =
                 ael::ArithmeticCoder::encode(
-                    acProcessed, outData, acDict, optout::OptOstreamRef(std::cout));
+                    processed.dc, outData, dcDict,
+                    logStream
+                );
+            assert(dcCount == processed.dc.size()
+                   && "Encoded number of dcs is not correct.");
+            outData.putTToPosition<std::uint32_t>(dcBitsCount, dcBitsCountPos[i]);
 
-            auto [acLengthesCnt, acLengthesBitsCnt] =
+            // Encode ac.
+            auto acDict = ael::dict::PPMDDictionary(processed.acRng, 1);
+            auto [acCount, acBitsCount] =
                 ael::ArithmeticCoder::encode(
-                    acLengthes, outData, acLengthesDict, optout::OptOstreamRef(std::cout));
+                    processed.acProcessed, outData, acDict,
+                    logStream
+                );
+            assert(acCount == processed.acProcessed.size()
+                   && "Encoded number of acs is not correct.");
+            outData.putTToPosition<std::uint32_t>(acBitsCount, acBitsCountPos[i]);
 
-            //outData.putTToPosition<std::uint32_t>(dcBitsCnt, dcBitsSizePos);
-            //outData.putTToPosition<std::uint32_t>(acBitsCnt, acBitsSizePos);
-            //outData.putTToPosition<std::uint32_t>(acCnt, acSizePos);
-            //outData.putTToPosition<std::uint32_t>(dcCnt, dcSizePos);
-            //outData.putTToPosition<std::uint32_t>(acLengthesCnt, acLengthesSizePos);
-            //outData.putTToPosition<std::uint32_t>(acLengthesBitsCnt, acLengthesBitSizePos);
+            // Encode ac lengthes.
+            auto acLengthesDict = ael::dict::PPMDDictionary(processed.acLengthesRng, 1);
+            auto [acLengthesCount, acLengthesBitsCount] =
+                ael::ArithmeticCoder::encode(
+                    processed.acLengthes, outData, acLengthesDict,
+                    logStream
+                );
+            assert(acLengthesCount == processed.acLengthes.size()
+                   && "Encoded number of lengthes is not correct.");
+            outData.putTToPosition<std::uint32_t>(acLengthesBitsCount, acLengthesBitsCountPos[i]);
 
             std::ofstream acsOs("acs" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto acI : acProcessed) {
+            for (auto acI : processed.acProcessed) {
                 acsOs << acI << std::endl;
             }
 
             std::ofstream acsLengthesOs("acs_lengths" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto acLength : acLengthes) {
-                acsLengthesOs << acLength << std::endl;
+            for (auto acLength : processed.acLengthes) {
+                acsLengthesOs << static_cast<std::size_t>(acLength) << std::endl;
             }
 
             std::ofstream dcsOs("dcs" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto dc : dcTransformed) {
+            for (auto dc : processed.dc) {
                 dcsOs << dc << std::endl;
             }
 
-            std::cout << "AC range: " << acRng << std::endl;
-            std::cout << "Length range: " << acLengthesRng << std::endl;
-            std::cout << acBitsCnt << " " << acLengthesBitsCnt << " " << dcBitsCnt << std::endl;
+            logStream << "AC range: " << processed.acRng << std::endl;
+            logStream << "DC range: " << processed.dcRng << std::endl;
+            logStream << "AC bits: " << acBitsCount << std::endl;
+            logStream << "AC lengthes bits: " << acLengthesBitsCount << std::endl;
+            logStream << "DC bits length: " << dcBitsCount << std::endl;
         }
 
         outCompressed.write(outData.data<const char>(), outData.size());

@@ -81,7 +81,7 @@ static nj_context_t nj;
 //   jpeg = The pointer to the memory dump.
 //   size = The size of the JPEG file.
 template <class ContainerT>
-void njDecode(ContainerT& out, const void* jpeg, const int size);
+std::size_t njDecode(ContainerT& out, const void* jpeg, const int size);
 
 constexpr static int W1 = 2841;
 constexpr static int W2 = 2676;
@@ -436,7 +436,8 @@ static inline void njConvert(void) {
 }
 
 template <class ContainerT>
-void njDecode(ContainerT& out, const void* jpeg, const int size) {
+std::size_t njDecode(ContainerT& out, const void* jpeg, const int size) {
+    std::size_t ret = 0;
     nj.pos = static_cast<const unsigned char*>(jpeg);
     nj.size = size & 0x7FFFFFFF;
     if (nj.size < 2
@@ -454,7 +455,11 @@ void njDecode(ContainerT& out, const void* jpeg, const int size) {
             case 0xC4: njDecodeDHT(); break;
             case 0xDB: njDecodeDQT(); break;
             case 0xDD: nj.decodeDRI(); break;
-            case 0xDA: njDecodeScan(out); break;
+            case 0xDA: {
+                njDecodeScan(out);
+                ret = nj.size - size;
+            }
+            break;
             case 0xFE: nj.skipMarker(); break;
             default:
                 if ((nj.pos[-1] & 0xF0) == 0xE0) {
@@ -468,6 +473,7 @@ void njDecode(ContainerT& out, const void* jpeg, const int size) {
         throw std::runtime_error("Tot finished.");
     }
     njConvert();
+    return ret;
 }
 
 #endif//_NANOJPEG_HPP

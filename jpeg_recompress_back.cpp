@@ -44,17 +44,17 @@ int main(int argc, char* argv[]) {
         auto height = inData.takeT<std::uint32_t>();
         auto nComp = inData.takeT<std::uint8_t>();
         
-        bc::static_vector<std::int32_t, 8> dcOffset(nComp);
-        bc::static_vector<std::uint32_t, 8> dcRng(nComp);
-        bc::static_vector<std::int32_t, 8> acOffset(nComp);
-        bc::static_vector<std::uint32_t, 8> acRng(nComp);
-        bc::static_vector<std::uint16_t, 8> acLengthRng(nComp);
+        bc::static_vector<std::int32_t, 3> dcOffset(nComp);
+        bc::static_vector<std::uint32_t, 3> dcRng(nComp);
+        bc::static_vector<std::int32_t, 3> acOffset(nComp);
+        bc::static_vector<std::uint32_t, 3> acRng(nComp);
+        bc::static_vector<std::uint16_t, 3> acLengthRng(nComp);
 
-        bc::static_vector<std::uint32_t, 8> blocksCount(nComp);
-        bc::static_vector<std::uint32_t, 8> dcBitsCount(nComp);
-        bc::static_vector<std::uint32_t, 8> acCount(nComp);
-        bc::static_vector<std::uint32_t, 8> acBitsCount(nComp);
-        bc::static_vector<std::uint32_t, 8> acLengthesBitsCount(nComp);
+        bc::static_vector<std::uint32_t, 3> blocksCount(nComp);
+        bc::static_vector<std::uint32_t, 3> dcBitsCount(nComp);
+        bc::static_vector<std::uint32_t, 3> acCount(nComp);
+        bc::static_vector<std::uint32_t, 3> acBitsCount(nComp);
+        bc::static_vector<std::uint32_t, 3> acLengthesBitsCount(nComp);
 
         for (std::size_t i = 0; i < nComp; ++i) {
             logStream << "Reading channel " << i << " info: " << std::endl;
@@ -109,41 +109,25 @@ int main(int argc, char* argv[]) {
                                            acLengthesBitsCount[i],
                                            logStream);
 
-            std::ofstream acsOs("acs-decode" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto acI : acProcessed) {
-                acsOs << acI << std::endl;
-            }
-
-            std::ofstream acsLengthesOs("acs_lengths-decode" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto acLength : acLengthes) {
-                acsLengthesOs << static_cast<std::size_t>(acLength) << std::endl;
-            }
-
-            std::ofstream dcsOs("dcs-decode" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto dc : dcMoved) {
-                dcsOs << dc << std::endl;
-            }
-
             channels[i] = ACDCTransform::processBack(
                 dcMoved, dcOffset[i], acProcessed, acOffset[i], acLengthes);
-
-            std::ofstream channelOfs("channel-decode" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto coeff : channels[i]) {
-                channelOfs << coeff << std::endl;
-            }
         }
 
         std::vector<std::int32_t> channelsJoined;
 
-        for (std::size_t i = 0; i < nComp; ++i) {
-            std::copy(channels[i].begin(), channels[i].end(), std::back_inserter(channelsJoined));
+        for (std::size_t i = 0; i < channels[0].size() / 256; ++i) {
+            std::copy(channels[0].begin() + i * 256,
+                      channels[0].begin() + (i + 1) * 256,
+                      std::back_inserter(channelsJoined));
+            std::copy(channels[1].begin() + i * 64,
+                      channels[1].begin() + (i + 1) * 64,
+                      std::back_inserter(channelsJoined));
+            std::copy(channels[2].begin() + i * 64,
+                      channels[2].begin() + (i + 1) * 64,
+                      std::back_inserter(channelsJoined));
         }
-        auto iter = channelsJoined.begin();
 
-        std::ofstream dcacOfstream("dc-ac-decode.txt", std::ios::out | std::ios::trunc);
-        for (auto dc : channelsJoined) {
-            dcacOfstream << dc << std::endl;
-        }
+        auto iter = channelsJoined.begin();
 
         jo_write_jpg(iter, fileOpener.getOutFileStream(), width, height,
                      nComp, imageQuality);

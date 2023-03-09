@@ -8,6 +8,7 @@
 #include <iostream>
 #include <iterator>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <fstream>
 #include <ranges>
@@ -58,6 +59,11 @@ int main(int argc, char* argv[]) {
 
         njDecode(channels, buff.data(), buff.size());
 
+        assert(channels[1].size() * 4 == channels[0].size()
+               && "Not 4-2-0.");
+        assert(channels[2].size() * 4 == channels[0].size()
+               && "Not 4-2-0.");
+
         std::cout << "Channels count: " << channels.size() << std::endl;
         for (auto& channel: channels) {
             std::cout << "Channel size: " << channel.size() << std::endl; 
@@ -74,17 +80,21 @@ int main(int argc, char* argv[]) {
         outData.putT(height);
         outData.putT(nComp);
 
-        bc::static_vector<std::size_t, 8> dcOffsetPos(nj.ncomp);
-        bc::static_vector<std::size_t, 8> dcRngPos(nj.ncomp);
-        bc::static_vector<std::size_t, 8> acOffsetPos(nj.ncomp);
-        bc::static_vector<std::size_t, 8> acRngPos(nj.ncomp);
-        bc::static_vector<std::size_t, 8> acLengthRngPos(nj.ncomp);
+        if (nj.ncomp > 3) {
+            throw std::invalid_argument("Unsupported channels count.");
+        }
 
-        bc::static_vector<std::size_t, 8> blocksCountPos(nj.ncomp);
-        bc::static_vector<std::size_t, 8> dcBitsCountPos(nj.ncomp);
-        bc::static_vector<std::size_t, 8> acCountPos(nj.ncomp);
-        bc::static_vector<std::size_t, 8> acBitsCountPos(nj.ncomp);
-        bc::static_vector<std::size_t, 8> acLengthesBitsCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> dcOffsetPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> dcRngPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> acOffsetPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> acRngPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> acLengthRngPos(nj.ncomp);
+
+        bc::static_vector<std::size_t, 3> blocksCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> dcBitsCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> acCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> acBitsCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> acLengthesBitsCountPos(nj.ncomp);
 
         for (std::size_t i = 0; i < nj.ncomp; ++i) {
             dcOffsetPos[i] = outData.saveSpaceForT<std::int32_t>();
@@ -101,12 +111,6 @@ int main(int argc, char* argv[]) {
         }
 
         for (std::size_t i = 0; i < nj.ncomp; ++i) {
-
-            std::ofstream channelOfs("channel" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto coeff : channels[i]) {
-                channelOfs << coeff << std::endl;
-            }
-
             /**
              * dcMoved
              * dcOffset
@@ -119,16 +123,21 @@ int main(int argc, char* argv[]) {
              */
             auto processed = ACDCTransform::process(channels[i]);
 
-            outData.putTToPosition<std::int32_t>(processed.dcOffset, dcOffsetPos[i]);
+            outData.putTToPosition<std::int32_t>(processed.dcOffset,
+                                                 dcOffsetPos[i]);
             outData.putTToPosition<std::uint32_t>(processed.dcRng, dcRngPos[i]);
-            outData.putTToPosition<std::int32_t>(processed.acOffset, acOffsetPos[i]);
+            outData.putTToPosition<std::int32_t>(processed.acOffset,
+                                                 acOffsetPos[i]);
             outData.putTToPosition<std::uint32_t>(processed.acRng, acRngPos[i]);
-            outData.putTToPosition<std::uint8_t>(processed.acLengthesRng, acLengthRngPos[i]);
+            outData.putTToPosition<std::uint8_t>(processed.acLengthesRng,
+                                                 acLengthRngPos[i]);
 
             assert(processed.acLengthes.size() == processed.dc.size()
                    && "AC lengthes count is not equal with DCs count.");
-            outData.putTToPosition<std::uint32_t>(processed.dc.size(), blocksCountPos[i]);
-            outData.putTToPosition<std::uint32_t>(processed.acProcessed.size(), acCountPos[i]);
+            outData.putTToPosition<std::uint32_t>(processed.dc.size(),
+                                                  blocksCountPos[i]);
+            outData.putTToPosition<std::uint32_t>(processed.acProcessed.size(),
+                                                  acCountPos[i]);
 
             // Encode dc.
             auto dcDict = ael::dict::PPMDDictionary(processed.dcRng, 1);
@@ -139,7 +148,8 @@ int main(int argc, char* argv[]) {
                 );
             assert(dcCount == processed.dc.size()
                    && "Encoded number of dcs is not correct.");
-            outData.putTToPosition<std::uint32_t>(dcBitsCount, dcBitsCountPos[i]);
+            outData.putTToPosition<std::uint32_t>(dcBitsCount,
+                                                  dcBitsCountPos[i]);
 
             // Encode ac.
             auto acDict = ael::dict::PPMDDictionary(processed.acRng, 1);
@@ -150,10 +160,12 @@ int main(int argc, char* argv[]) {
                 );
             assert(acCount == processed.acProcessed.size()
                    && "Encoded number of acs is not correct.");
-            outData.putTToPosition<std::uint32_t>(acBitsCount, acBitsCountPos[i]);
+            outData.putTToPosition<std::uint32_t>(acBitsCount,
+                                                  acBitsCountPos[i]);
 
             // Encode ac lengthes.
-            auto acLengthesDict = ael::dict::PPMDDictionary(processed.acLengthesRng, 1);
+            auto acLengthesDict =
+                ael::dict::PPMDDictionary(processed.acLengthesRng, 1);
             auto [acLengthesCount, acLengthesBitsCount] =
                 ael::ArithmeticCoder::encode(
                     processed.acLengthes, outData, acLengthesDict,
@@ -161,27 +173,13 @@ int main(int argc, char* argv[]) {
                 );
             assert(acLengthesCount == processed.acLengthes.size()
                    && "Encoded number of lengthes is not correct.");
-            outData.putTToPosition<std::uint32_t>(acLengthesBitsCount, acLengthesBitsCountPos[i]);
-
-            std::ofstream acsOs("acs" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto acI : processed.acProcessed) {
-                acsOs << acI << std::endl;
-            }
-
-            std::ofstream acsLengthesOs("acs_lengths" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto acLength : processed.acLengthes) {
-                acsLengthesOs << static_cast<std::size_t>(acLength) << std::endl;
-            }
-
-            std::ofstream dcsOs("dcs" + std::to_string(i) + ".txt", std::ios::out | std::ios::trunc);
-            for (auto dc : processed.dc) {
-                dcsOs << dc << std::endl;
-            }
+            outData.putTToPosition<std::uint32_t>(acLengthesBitsCount,
+                                                  acLengthesBitsCountPos[i]);
 
             logStream << "AC range: " << processed.acRng << std::endl;
             logStream << "DC range: " << processed.dcRng << std::endl;
             logStream << "AC bits: " << acBitsCount << std::endl;
-            logStream << "AC lengthes bits: " << acLengthesBitsCount << std::endl;
+            logStream << "AC len bits: " << acLengthesBitsCount << std::endl;
             logStream << "DC bits length: " << dcBitsCount << std::endl;
         }
 

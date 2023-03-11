@@ -1,4 +1,4 @@
-#include "process.hpp"
+#include "dc_ac_transform.hpp"
 #include <algorithm>
 #include <bits/ranges_algo.h>
 #include <cstddef>
@@ -8,7 +8,7 @@
 #include <boost/range/adaptor/transformed.hpp>
 
 ////////////////////////////////////////////////////////////////////////////////
-auto ACDCTransform::process(const std::vector<std::int32_t>& coeffs) -> Ret {
+auto DCACTransform::process(const std::vector<std::int32_t>& coeffs) -> Ret {
     auto [dc, ac] = _splitACDC(coeffs);
     auto acReordered = _acZigZagReorder(ac);
     auto [acCut, acLengthes] = _acTailsZip(acReordered);
@@ -28,7 +28,7 @@ auto ACDCTransform::process(const std::vector<std::int32_t>& coeffs) -> Ret {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-std::vector<std::int32_t> ACDCTransform::processBack(
+std::vector<std::int32_t> DCACTransform::processBack(
         const std::vector<std::uint32_t>& dcMoved,
         std::int32_t dcOffset,
         const std::vector<std::uint32_t>& acProcessed,
@@ -42,7 +42,7 @@ std::vector<std::int32_t> ACDCTransform::processBack(
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-auto ACDCTransform::_splitACDC(
+auto DCACTransform::_splitACDC(
         const std::vector<std::int32_t>& blocks) -> _ACDCSplitRes {
     _ACDCSplitRes ret;
     assert(blocks.size() % 64 == 0 && "Incorrect blocks size.");
@@ -54,7 +54,7 @@ auto ACDCTransform::_splitACDC(
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-auto ACDCTransform::_rangeMove(
+auto DCACTransform::_rangeMove(
         const std::vector<std::int32_t>& numbers) -> _RangeMoveRes {
     _RangeMoveRes ret;
     const auto [minIter, maxIter] = std::ranges::minmax_element(numbers);
@@ -71,7 +71,7 @@ auto ACDCTransform::_rangeMove(
 
 ////////////////////////////////////////////////////////////////////////////////
 std::vector<std::int32_t>
-ACDCTransform::_acZigZagReorder(const std::vector<std::int32_t>& coeffs) {
+DCACTransform::_acZigZagReorder(const std::vector<std::int32_t>& coeffs) {
     std::vector<std::int32_t> ret;
     for (auto iter = coeffs.begin(); iter < coeffs.end(); iter += 63) {
         for (std::size_t i = 0; i < 63; ++i) {
@@ -82,7 +82,7 @@ ACDCTransform::_acZigZagReorder(const std::vector<std::int32_t>& coeffs) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-auto ACDCTransform::_acTailsZip(
+auto DCACTransform::_acTailsZip(
         const std::vector<std::int32_t>& coeffs) -> _TailsZipResult {
     _TailsZipResult ret;
     for (auto iter = coeffs.begin(); iter < coeffs.end(); iter += 63) {
@@ -97,7 +97,7 @@ auto ACDCTransform::_acTailsZip(
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-std::vector<std::int32_t> ACDCTransform::_joinACDC(
+std::vector<std::int32_t> DCACTransform::_joinACDC(
         const std::vector<std::int32_t>& dc,
         const std::vector<std::int32_t>& ac) {
     std::vector<std::int32_t> ret;
@@ -112,7 +112,7 @@ std::vector<std::int32_t> ACDCTransform::_joinACDC(
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-std::vector<std::int32_t> ACDCTransform::_rangeMoveBack(
+std::vector<std::int32_t> DCACTransform::_rangeMoveBack(
         const std::vector<std::uint32_t>& numbersMoved,
         std::int32_t offset) {
     std::vector<std::int32_t> ret;        
@@ -126,7 +126,7 @@ std::vector<std::int32_t> ACDCTransform::_rangeMoveBack(
 
 ////////////////////////////////////////////////////////////////////////////////
 std::vector<std::int32_t>
-ACDCTransform::_acZigZagReorderBack(const std::vector<std::int32_t>& coeffs) {
+DCACTransform::_acZigZagReorderBack(const std::vector<std::int32_t>& coeffs) {
     std::vector<std::int32_t> ret;
     for (auto iter = coeffs.begin(); iter < coeffs.end(); iter += 63) {
         for (std::size_t i = 0; i < 63; ++i) {
@@ -137,7 +137,7 @@ ACDCTransform::_acZigZagReorderBack(const std::vector<std::int32_t>& coeffs) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-std::vector<std::int32_t> ACDCTransform::_acTailsUnzip(
+std::vector<std::int32_t> DCACTransform::_acTailsUnzip(
         const std::vector<std::int32_t>& acCut,
         const std::vector<std::uint8_t>& acLengthes) {
     std::vector<std::int32_t> ret;

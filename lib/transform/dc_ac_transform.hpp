@@ -12,7 +12,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 /// \brief The Process class
 ///
-class ACDCTransform {
+class DCACTransform {
 public:
 
     struct Ret {

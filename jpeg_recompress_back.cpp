@@ -16,7 +16,7 @@
 #include "applib/file_opener.hpp"
 #include "applib/opt_ostream.hpp"
 #include "lib/jo/jo_write_jpeg.hpp"
-#include "lib/magical/process.hpp"
+#include "lib/transform/dc_ac_transform.hpp"
 
 namespace bc = boost::container;
 
@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
                                            acLengthesBitsCount[i],
                                            logStream);
 
-            channels[i] = ACDCTransform::processBack(
+            channels[i] = DCACTransform::processBack(
                 dcMoved, dcOffset[i], acProcessed, acOffset[i], acLengthes);
         }
 

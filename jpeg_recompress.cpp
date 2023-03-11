@@ -24,7 +24,7 @@
 #include <boost/range/adaptor/transformed.hpp>
 
 #include "lib/file_io.hpp"
-#include "lib/magical/process.hpp"
+#include "lib/transform/dc_ac_transform.hpp"
 #include "lib/nj/nanojpeg.hpp"
 
 namespace bc = boost::container;
@@ -119,7 +119,7 @@ int main(int argc, char* argv[]) {
              * acLengthes
              * acLengthesRng
              */
-            auto processed = ACDCTransform::process(channels[i]);
+            auto processed = DCACTransform::process(channels[i]);
 
             outData.putTToPosition<std::int32_t>(processed.dcOffset,
                                                  dcOffsetPos[i]);

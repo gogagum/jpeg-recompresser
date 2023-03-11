@@ -41,16 +41,16 @@ int main(int argc, char* argv[]) {
 
         auto inFile = jrec::io::openInputBinFile(inFileName);
         auto buff = jrec::io::readWholeFile(inFile);
-        //const auto headerSize = njDecodeHeader(buff.data(), buff.size());
+        const auto headerSize = njDecodeHeader(buff.data(), buff.size());
 
-        //std::cout << "Header size: " << headerSize << std::endl;
+        logStream << "Header size: " << headerSize << std::endl;
 
-        //std::span<const std::byte> fileWithNoHeader(
-        //    fileOpener.getInData().begin() + headerSize,
-        //    fileOpener.getInData().end()
-        //);
+        std::span<const std::byte> fileWithNoHeader(
+            fileOpener.getInData().begin() + headerSize,
+            fileOpener.getInData().end()
+        );
 
-        auto inData = ael::DataParser(fileOpener.getInData());
+        auto inData = ael::DataParser(fileWithNoHeader);
 
         auto imageQuality = inData.takeT<std::uint32_t>();
         auto width = inData.takeT<std::uint32_t>();
@@ -124,11 +124,6 @@ int main(int argc, char* argv[]) {
 
             channels[i] = DCACTransform::processBack(
                 dcMoved, dcOffset[i], acProcessed, acOffset[i], acLengthes);
-
-            std::ofstream chStream("decoded_coeffs_" + std::to_string(i) , std::ios::trunc);
-            for (auto coeff : channels[i]) {
-                chStream << coeff << std::endl;
-            }
         }
 
         std::vector<std::int32_t> channelsJoined;
@@ -147,7 +142,7 @@ int main(int argc, char* argv[]) {
 
         auto iter = channelsJoined.begin();
 
-        //fileOpener.getOutFileStream().write(buff.data(), headerSize);
+        fileOpener.getOutFileStream().write(buff.data(), headerSize);
 
         jo_write_jpg(iter, fileOpener.getOutFileStream(), width, height,
                      nComp, imageQuality);

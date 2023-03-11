@@ -1,6 +1,7 @@
 #ifndef JO_WRITE_JPEG_HPP
 #define JO_WRITE_JPEG_HPP
 
+#include <array>
 #include <iterator>
 #include <fstream>
 
@@ -15,9 +16,6 @@ struct QualityEstimation {
 };
 
 QualityEstimation estimQuality(int quality);
-
-bool jo_write_headers(std::ofstream& outBinary, int width, int height,
-                      int comp, int quality);
 
 void jo_DCT(float &d0, float &d1, float &d2, float &d3, float &d4,
             float &d5, float &d6, float &d7);
@@ -53,7 +51,7 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
             int n = *inDCT;
             ++inDCT;
 
-            DU[tbl::s_jo_ZigZag[j]] = n;// (int)(v < 0 ? ceilf(v - 0.5f) : floorf(v + 0.5f));
+            DU[tbl::s_jo_ZigZag[j]] = n;
         }
     }
     int n;
@@ -74,8 +72,7 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
     }
     // Encode ACs
     int end0pos = 63;
-    for (; (end0pos > 0) && (DU[end0pos] == 0); --end0pos) {
-    }
+    for (; (end0pos > 0) && (DU[end0pos] == 0); --end0pos) {}
     // end0pos = first element in reverse order !=0
     if (end0pos == 0) {
         jo_writeBits(outJpeg, bitBuf, bitCnt, EOB);
@@ -83,15 +80,13 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
     }
     for (int i = 1; i <= end0pos; ++i) {
         int startpos = i;
-        for (; DU[i] == 0 && i <= end0pos; ++i) {
-        }
+        for (; DU[i] == 0 && i <= end0pos; ++i) {}
         int nrzeroes = i - startpos;
         if (nrzeroes >= 16) {
-            int lng = nrzeroes >> 4;
-            for (int nrmarker = 1; nrmarker <= lng; ++nrmarker) {
+            for (int nrmarker = 1; nrmarker <= (nrzeroes >> 4); ++nrmarker) {
                 writeJpegBits(M16zeroes);
             }
-            nrzeroes &= 15;
+            nrzeroes &= 0xF;
         }
         unsigned short bits[2];
         jo_calcBits(DU[i], bits);
@@ -116,10 +111,6 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
         return false;
     }
 
-    if (!jo_write_headers(outJpeg, width, height, comp, quality)) {
-        return false;
-    }
-
     const auto writeArr =
         [&outJpeg](const auto& arr, std::size_t startOffset = 0) {
             outJpeg.write(reinterpret_cast<const char*>(arr.data() + startOffset),
@@ -131,19 +122,23 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
 
     const auto [actualQuality, subsample] = estimQuality(quality);
 
-    unsigned char YTable[64], UVTable[64];
+    std::array<unsigned char, 64> YTable;
+    std::array<unsigned char, 64> UVTable;
     for (int i = 0; i < 64; ++i) {
+        const auto iZZ = tbl::s_jo_ZigZag[i];
         int yti = (tbl::YQT[i] * actualQuality + 50) / 100;
-        YTable[tbl::s_jo_ZigZag[i]] = yti < 1 ? 1 : yti > 255 ? 255 : yti;
+        YTable[iZZ] = yti < 1 ? 1 : yti > 255 ? 255 : yti;
         int uvti = (tbl::UVQT[i] * actualQuality + 50) / 100;
-        UVTable[tbl::s_jo_ZigZag[i]] = uvti < 1 ? 1 : uvti > 255 ? 255 : uvti;
+        UVTable[iZZ] = uvti < 1 ? 1 : uvti > 255 ? 255 : uvti;
     }
 
-    float fdtbl_Y[64], fdtbl_UV[64];
+    std::array<float, 64> fdtbl_Y;
+    std::array<float, 64> fdtbl_UV;
     for (int row = 0, k = 0; row < 8; ++row) {
         for (int col = 0; col < 8; ++col, ++k) {
-            fdtbl_Y[k] = 1 / (YTable[tbl::s_jo_ZigZag[k]] * tbl::aasf[row] * tbl::aasf[col]);
-            fdtbl_UV[k] = 1 / (UVTable[tbl::s_jo_ZigZag[k]] * tbl::aasf[row] * tbl::aasf[col]);
+            const auto kZZ = tbl::s_jo_ZigZag[k];
+            fdtbl_Y[k] = 1 / (YTable[kZZ] * tbl::aasf[row] * tbl::aasf[col]);
+            fdtbl_UV[k] = 1 / (UVTable[kZZ] * tbl::aasf[row] * tbl::aasf[col]);
         }
     }
 
@@ -151,14 +146,16 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
     int ofsG = comp > 1 ? 1 : 0, ofsB = comp > 1 ? 2 : 0;
     int DCY = 0, DCU = 0, DCV = 0;
     int bitBuf = 0, bitCnt = 0;
-    const auto processDU = [&inDCT, &outJpeg, &bitBuf, &bitCnt](auto&&... tailArgs) {
+    const auto processDU = [&](auto&&... tailArgs) {
         return jo_processDU(inDCT, outJpeg, bitBuf, bitCnt, tailArgs...);
     };
 
     if (subsample) {
         for (int y = 0; y < height; y += 16) {
             for (int x = 0; x < width; x += 16) {
-                float Y[256], U[256], V[256];
+                std::array<float, 256> Y;
+                std::array<float, 256> U;
+                std::array<float, 256> V;
                 for (int row = y, pos = 0; row < y + 16; ++row) {
                     for (int col = x; col < x + 16; ++col, ++pos) {
                         int prow = row >= height ? height - 1 : row;
@@ -166,28 +163,39 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
                         int p = prow * width*comp + pcol * comp;
                     }
                 }
-                DCY = processDU(Y + 0, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = processDU(Y + 8, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = processDU(Y + 128, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCY = processDU(Y + 136, 16, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
+                DCY = processDU(Y.data() + 0,   16, fdtbl_Y.data(), DCY,
+                                tbl::YDC_HT, tbl::YAC_HT);
+                DCY = processDU(Y.data() + 8,   16, fdtbl_Y.data(), DCY,
+                                tbl::YDC_HT, tbl::YAC_HT);
+                DCY = processDU(Y.data() + 128, 16, fdtbl_Y.data(), DCY,
+                                tbl::YDC_HT, tbl::YAC_HT);
+                DCY = processDU(Y.data() + 136, 16, fdtbl_Y.data(), DCY,
+                                tbl::YDC_HT, tbl::YAC_HT);
                 // subsample U,V
-                float subU[64], subV[64];
+                std::array<float, 64> subU;
+                std::array<float, 64> subV;
                 for (int yy = 0, pos = 0; yy < 8; ++yy) {
                     for (int xx = 0; xx < 8; ++xx, ++pos) {
-                        int j = yy * 32 + xx * 2;
-                        subU[pos] = (U[j + 0] + U[j + 1] + U[j + 16] + U[j + 17]) * 0.25f;
-                        subV[pos] = (V[j + 0] + V[j + 1] + V[j + 16] + V[j + 17]) * 0.25f;
+                        const int j = yy * 32 + xx * 2;
+                        subU[pos] =
+                            (U[j + 0] + U[j + 1] + U[j + 16] + U[j + 17]) * 0.25f;
+                        subV[pos] =
+                            (V[j + 0] + V[j + 1] + V[j + 16] + V[j + 17]) * 0.25f;
                     }
                 }
-                DCU = processDU(subU, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = processDU(subV, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCU = processDU(subU.data(), 8, fdtbl_UV.data(),
+                                DCU, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = processDU(subV.data(), 8, fdtbl_UV.data(),
+                                DCV, tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }
     else {
         for (int y = 0; y < height; y += 8) {
             for (int x = 0; x < width; x += 8) {
-                float Y[64], U[64], V[64];
+                std::array<float, 64> Y;
+                std::array<float, 64> U;
+                std::array<float, 64> V;
                 for (int row = y, pos = 0; row < y + 8; ++row) {
                     for (int col = x; col < x + 8; ++col, ++pos) {
                         int prow = row >= height ? height - 1 : row;
@@ -195,9 +203,12 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
                         int p = prow * width*comp + pcol * comp;
                     }
                 }
-                DCY = processDU(Y, 8, fdtbl_Y, DCY, tbl::YDC_HT, tbl::YAC_HT);
-                DCU = processDU(U, 8, fdtbl_UV, DCU, tbl::UVDC_HT, tbl::UVAC_HT);
-                DCV = processDU(V, 8, fdtbl_UV, DCV, tbl::UVDC_HT, tbl::UVAC_HT);
+                DCY = processDU(Y.data(), 8, fdtbl_Y.data(), DCY,
+                                tbl::YDC_HT, tbl::YAC_HT);
+                DCU = processDU(U.data(), 8, fdtbl_UV.data(), DCU,
+                                tbl::UVDC_HT, tbl::UVAC_HT);
+                DCV = processDU(V.data(), 8, fdtbl_UV.data(), DCV,
+                                tbl::UVDC_HT, tbl::UVAC_HT);
             }
         }
     }

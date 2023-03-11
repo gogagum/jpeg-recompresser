@@ -57,23 +57,21 @@ int main(int argc, char* argv[]) {
 
         const auto headerSize = njDecode(channels, buff.data(), buff.size());
 
-        //std::cout << "Header size: " << headerSize << std::endl;
+        logStream << "Header size: " << headerSize << std::endl;
 
-        //auto headerCopy = std::vector<char>();
-        //std::copy(buff.begin(), buff.begin() + headerSize,
-        //          std::back_inserter(headerCopy));
+        auto headerCopy = std::vector<char>();
+        std::copy(buff.begin(), buff.begin() + headerSize,
+                  std::back_inserter(headerCopy));
 
         assert(channels[1].size() * 4 == channels[0].size()
                && "Not 4-2-0.");
         assert(channels[2].size() * 4 == channels[0].size()
                && "Not 4-2-0.");
 
-        std::cout << "Channels count: " << channels.size() << std::endl;
+        logStream << "Channels count: " << channels.size() << std::endl;
         for (auto& channel: channels) {
-            std::cout << "Channel size: " << channel.size() << std::endl; 
+            logStream << "Channel size: " << channel.size() << std::endl; 
         }
-
-        std::cout << nj.ncomp << std::endl;
 
         auto width = std::uint32_t(nj.getWidth());
         auto height = std::uint32_t(nj.getHeight());
@@ -185,14 +183,14 @@ int main(int argc, char* argv[]) {
             outData.putTToPosition<std::uint32_t>(acLengthesBitsCount,
                                                   acLengthesBitsCountPos[i]);
 
-            logStream << "AC range: " << processed.acRng << std::endl;
-            logStream << "DC range: " << processed.dcRng << std::endl;
-            logStream << "AC bits: " << acBitsCount << std::endl;
-            logStream << "AC len bits: " << acLengthesBitsCount << std::endl;
-            logStream << "DC bits length: " << dcBitsCount << std::endl;
+            logStream << "AC range: "       << processed.acRng     << std::endl;
+            logStream << "DC range: "       << processed.dcRng     << std::endl;
+            logStream << "AC bits: "        << acBitsCount         << std::endl;
+            logStream << "AC len bits: "    << acLengthesBitsCount << std::endl;
+            logStream << "DC bits length: " << dcBitsCount         << std::endl;
         }
 
-        //outCompressed.write(headerCopy.data(), headerCopy.size());
+        outCompressed.write(headerCopy.data(), headerCopy.size());
         outCompressed.write(outData.data<const char>(), outData.size());
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;

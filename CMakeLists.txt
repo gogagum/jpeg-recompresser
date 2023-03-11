@@ -42,8 +42,7 @@ if(Boost_FOUND)
                    lib/nj/nanojpeg.hpp
                    lib/nj/nanojpeg.cpp
                    lib/file_io.cpp
-                   lib/magical/process.cpp
-                   lib/magical/words_transform.cpp)
+                   lib/magical/process.cpp)
     target_link_libraries(jpeg-recompress-2 archievers-applib arithmetic-encoding-lib)
 
     add_executable(jpeg-recompress-back jpeg_recompress_back.cpp
@@ -55,8 +54,7 @@ if(Boost_FOUND)
     add_executable(jpeg-recompress-back-2 jpeg_recompress_back_2.cpp
                    lib/file_io.cpp
                    lib/jo/jo_write_jpeg.cpp
-                   lib/magical/process.cpp
-                   lib/magical/words_transform.cpp)
+                   lib/magical/process.cpp)
     target_link_libraries(jpeg-recompress-back-2 archievers-applib arithmetic-encoding-lib)
 endif()
 

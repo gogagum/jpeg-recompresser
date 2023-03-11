@@ -24,7 +24,7 @@
 #include <boost/range/adaptor/transformed.hpp>
 
 #include "lib/file_io.hpp"
-#include "lib/transform/dc_ac_transform.hpp"
+#include "lib/transform/dc_ac_transform2.hpp"
 #include "lib/nj/nanojpeg.hpp"
 
 namespace bc = boost::container;
@@ -119,7 +119,7 @@ int main(int argc, char* argv[]) {
              * acLengthes
              * acLengthesRng
              */
-            auto processed = DCACTransform::process(channels[i]);
+            auto processed = DCACTransform2::process(channels[i]);
 
             outData.putTToPosition<std::int32_t>(processed.dcOffset,
                                                  dcOffsetPos[i]);
@@ -127,11 +127,7 @@ int main(int argc, char* argv[]) {
             outData.putTToPosition<std::int32_t>(processed.acOffset,
                                                  acOffsetPos[i]);
             outData.putTToPosition<std::uint32_t>(processed.acRng, acRngPos[i]);
-            outData.putTToPosition<std::uint8_t>(processed.acLengthesRng,
-                                                 acLengthRngPos[i]);
-
-            assert(processed.acLengthes.size() == processed.dc.size()
-                   && "AC lengthes count is not equal with DCs count.");
+            
             outData.putTToPosition<std::uint32_t>(processed.dc.size(),
                                                   blocksCountPos[i]);
             outData.putTToPosition<std::uint32_t>(processed.acProcessed.size(),
@@ -177,7 +173,7 @@ int main(int argc, char* argv[]) {
             logStream << "AC range: " << processed.acRng << std::endl;
             logStream << "DC range: " << processed.dcRng << std::endl;
             logStream << "AC bits: " << acBitsCount << std::endl;
-            logStream << "AC len bits: " << acLengthesBitsCount << std::endl;
+            logStream << "AC lengthes bits: " << acLengthesBitsCount << std::endl;
             logStream << "DC bits length: " << dcBitsCount << std::endl;
         }
 

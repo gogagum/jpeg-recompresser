@@ -42,7 +42,7 @@ if(Boost_FOUND)
                    lib/nj/nanojpeg.hpp
                    lib/nj/nanojpeg.cpp
                    lib/file_io.cpp
-                   lib/transform/dc_ac_transform.cpp)
+                   lib/transform/dc_ac_transform2.cpp)
     target_link_libraries(jpeg-recompress-2 archievers-applib arithmetic-encoding-lib)
 
     add_executable(jpeg-recompress-back jpeg_recompress_back.cpp

@@ -27,7 +27,7 @@ namespace bc = boost::container;
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         std::cout << "Usage: " << std::string(argv[0])
-                  << " <input-jpeg> <out-binary-file>" << std::endl;
+                  << " <input-binary-file> <uncompressed-jpeg>" << std::endl;
         return 0;
     }
 

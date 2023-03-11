@@ -32,26 +32,26 @@ if(Boost_FOUND)
     include_directories(archiever/applib/include)
 
     add_executable(jpeg-recompress jpeg_recompress.cpp
-                   lib/nj/nanojpeg.hpp
                    lib/nj/nanojpeg.cpp
                    lib/file_io.cpp
                    lib/transform/dc_ac_transform.cpp)
     target_link_libraries(jpeg-recompress archievers-applib arithmetic-encoding-lib)
 
     add_executable(jpeg-recompress-2 jpeg_recompress_2.cpp
-                   lib/nj/nanojpeg.hpp
                    lib/nj/nanojpeg.cpp
                    lib/file_io.cpp
                    lib/transform/dc_ac_transform2.cpp)
     target_link_libraries(jpeg-recompress-2 archievers-applib arithmetic-encoding-lib)
 
     add_executable(jpeg-recompress-back jpeg_recompress_back.cpp
+                   lib/nj/nanojpeg.cpp
                    lib/file_io.cpp
                    lib/jo/jo_write_jpeg.cpp
                    lib/transform/dc_ac_transform.cpp)
     target_link_libraries(jpeg-recompress-back archievers-applib arithmetic-encoding-lib)
 
     add_executable(jpeg-recompress-back-2 jpeg_recompress_back_2.cpp
+                   lib/nj/nanojpeg.cpp
                    lib/file_io.cpp
                    lib/jo/jo_write_jpeg.cpp
                    lib/transform/dc_ac_transform.cpp)

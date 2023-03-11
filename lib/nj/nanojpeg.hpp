@@ -1,11 +1,13 @@
 #ifndef _NANOJPEG_HPP
 #define _NANOJPEG_HPP
 
+#include <cstddef>
 #include <iterator>
 #include <vector>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 
 #include "exceptions.hpp"
 
@@ -334,14 +336,14 @@ static inline void njDecodeScan(ContainerT& container) {
     int i, mbx, mby, sbx, sby;
     int rstcount = nj.rstinterval, nextrst = 0;
     nj_component_t* c;
-    nj.decodeLength();
+    nj.decodeLength();  // 4 bytes
     if (nj.length < (4 + 2 * nj.ncomp))  {
         throw SyntaxErrorException();
     }
     if (nj.pos[0] != nj.ncomp) {
         throw UnsupportedException();
     }
-    nj.skip(1);
+    nj.skip(1);  // 1 byte
     for (i = 0, c = nj.comp;  i < nj.ncomp;  ++i, ++c) {
         if (nj.pos[0] != c->cid
                 || nj.pos[1] & 0xEE) {
@@ -452,21 +454,21 @@ std::size_t njDecode(ContainerT& out, const void* jpeg, const int size) {
         nj.skip(2);
         switch (nj.pos[-1]) {
             case 0xC0: njDecodeSOF(); break;
-            case 0xC4: njDecodeDHT(); break;
+            case 0xC4: njDecodeDHT(); ret = size - nj.size; break;
             case 0xDB: njDecodeDQT(); break;
             case 0xDD: nj.decodeDRI(); break;
             case 0xDA: {
                 njDecodeScan(out);
-                ret = nj.size - size;
             }
             break;
-            case 0xFE: nj.skipMarker(); break;
+            case 0xFE: nj.skipMarker(); std::cout << "LOG offset: " << size - nj.size << std::endl; break;
             default:
                 if ((nj.pos[-1] & 0xF0) == 0xE0) {
                     nj.skipMarker();
                 } else {
                     throw UnsupportedException();
                 }
+                std::cout << "LOG offset: " << size - nj.size << std::endl; break;
         }
     }
     if (!nj.finished) {
@@ -475,6 +477,8 @@ std::size_t njDecode(ContainerT& out, const void* jpeg, const int size) {
     njConvert();
     return ret;
 }
+
+std::size_t njDecodeHeader(const void* jpeg, const int size);
 
 #endif//_NANOJPEG_HPP
 

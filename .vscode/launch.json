@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/build/jpeg-recompress",
-            "args": ["jpeg30/girl30.jpg", "girl30-test", "30"],
+            "args": ["jpeg80/lena80.jpg", "lena80-test", "80"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],

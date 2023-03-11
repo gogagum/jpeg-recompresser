@@ -23,8 +23,10 @@
 
 #include <boost/range/adaptor/transformed.hpp>
 
+#include "ael/dictionary/decreasing_counts_dictionary.hpp"
 #include "lib/file_io.hpp"
 #include "lib/magical/process.hpp"
+#include "lib/magical/words_transform.hpp"
 #include "lib/nj/nanojpeg.hpp"
 
 namespace bc = boost::container;
@@ -93,6 +95,9 @@ int main(int argc, char* argv[]) {
         bc::static_vector<std::size_t, 3> acCountPos(nj.ncomp);
         bc::static_vector<std::size_t, 3> acBitsCountPos(nj.ncomp);
         bc::static_vector<std::size_t, 3> acLengthesBitsCountPos(nj.ncomp);
+        
+        bc::static_vector<std::size_t, 3> acWordsCountPos(nj.ncomp);
+        bc::static_vector<std::size_t, 3> acWordsBitsCountPos(nj.ncomp);
 
         for (std::size_t i = 0; i < nj.ncomp; ++i) {
             dcOffsetPos[i] = outData.saveSpaceForT<std::int32_t>();
@@ -106,6 +111,9 @@ int main(int argc, char* argv[]) {
             acCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
             acBitsCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
             acLengthesBitsCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
+
+            acWordsCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
+            acWordsBitsCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
         }
 
         for (std::size_t i = 0; i < nj.ncomp; ++i) {
@@ -120,6 +128,8 @@ int main(int argc, char* argv[]) {
              * acLengthesRng
              */
             auto processed = ACDCTransform::process(channels[i]);
+
+            auto ac2 = WordsTransform::process(processed.acProcessed);
 
             outData.putTToPosition<std::int32_t>(processed.dcOffset,
                                                  dcOffsetPos[i]);
@@ -136,6 +146,8 @@ int main(int argc, char* argv[]) {
                                                   blocksCountPos[i]);
             outData.putTToPosition<std::uint32_t>(processed.acProcessed.size(),
                                                   acCountPos[i]);
+            outData.putTToPosition<std::uint32_t>(ac2.words.size(),
+                                                  acWordsCountPos[i]);
 
             // Encode dc.
             auto dcDict = ael::dict::PPMDDictionary(processed.dcRng, 1);
@@ -149,11 +161,19 @@ int main(int argc, char* argv[]) {
             outData.putTToPosition<std::uint32_t>(dcBitsCount,
                                                   dcBitsCountPos[i]);
 
+            // Encode ac words mapping.
+            auto acWordsDict = ael::dict::DecreasingCountDictionary<std::uint64_t>(processed.acRng);
+            auto [acWordsCnt, acWordsBitsCnt] =
+                ael::ArithmeticCoder::encode(ac2.words, outData, acWordsDict, logStream);
+            assert(acWordsCnt == ac2.words.size()
+                   && "Encoded number of words for ac is not correct.");
+            outData.putTToPosition<std::uint32_t>(acWordsBitsCnt, acWordsBitsCountPos[i]);
+
             // Encode ac.
-            auto acDict = ael::dict::PPMDDictionary(processed.acRng, 1);
+            auto acDict = ael::dict::PPMDDictionary(ac2.words.size(), 1);
             auto [acCount, acBitsCount] =
                 ael::ArithmeticCoder::encode(
-                    processed.acProcessed, outData, acDict,
+                    ac2.transforemed, outData, acDict,
                     logStream
                 );
             assert(acCount == processed.acProcessed.size()
@@ -177,6 +197,7 @@ int main(int argc, char* argv[]) {
             logStream << "AC range: " << processed.acRng << std::endl;
             logStream << "DC range: " << processed.dcRng << std::endl;
             logStream << "AC bits: " << acBitsCount << std::endl;
+            logStream << "AC words bits: " << acWordsBitsCnt << std::endl;
             logStream << "AC len bits: " << acLengthesBitsCount << std::endl;
             logStream << "DC bits length: " << dcBitsCount << std::endl;
         }

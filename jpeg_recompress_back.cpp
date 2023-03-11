@@ -15,7 +15,9 @@
 
 #include "applib/file_opener.hpp"
 #include "applib/opt_ostream.hpp"
+#include "lib/file_io.hpp"
 #include "lib/jo/jo_write_jpeg.hpp"
+#include "lib/nj/nanojpeg.hpp"
 #include "lib/transform/dc_ac_transform.hpp"
 
 namespace bc = boost::container;
@@ -36,6 +38,18 @@ int main(int argc, char* argv[]) {
         auto logStream = optout::OptOstreamRef{std::cout};
 
         auto fileOpener = FileOpener(inFileName, outFileName);
+
+        auto inFile = jrec::io::openInputBinFile(inFileName);
+        auto buff = jrec::io::readWholeFile(inFile);
+        //const auto headerSize = njDecodeHeader(buff.data(), buff.size());
+
+        //std::cout << "Header size: " << headerSize << std::endl;
+
+        //std::span<const std::byte> fileWithNoHeader(
+        //    fileOpener.getInData().begin() + headerSize,
+        //    fileOpener.getInData().end()
+        //);
+
         auto inData = ael::DataParser(fileOpener.getInData());
 
         auto imageQuality = inData.takeT<std::uint32_t>();
@@ -110,6 +124,11 @@ int main(int argc, char* argv[]) {
 
             channels[i] = DCACTransform::processBack(
                 dcMoved, dcOffset[i], acProcessed, acOffset[i], acLengthes);
+
+            std::ofstream chStream("decoded_coeffs_" + std::to_string(i) , std::ios::trunc);
+            for (auto coeff : channels[i]) {
+                chStream << coeff << std::endl;
+            }
         }
 
         std::vector<std::int32_t> channelsJoined;
@@ -127,6 +146,8 @@ int main(int argc, char* argv[]) {
         }
 
         auto iter = channelsJoined.begin();
+
+        //fileOpener.getOutFileStream().write(buff.data(), headerSize);
 
         jo_write_jpg(iter, fileOpener.getOutFileStream(), width, height,
                      nComp, imageQuality);

@@ -20,7 +20,7 @@ bool jo_write_headers(std::ofstream& outBinary, int width, int height,
                       int comp, int quality);
 
 void jo_DCT(float &d0, float &d1, float &d2, float &d3, float &d4,
-                   float &d5, float &d6, float &d7);
+            float &d5, float &d6, float &d7);
 
 void jo_calcBits(int val, unsigned short bits[2]);
 

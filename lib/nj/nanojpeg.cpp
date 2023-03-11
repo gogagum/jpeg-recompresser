@@ -245,3 +245,36 @@ unsigned char nj_context_t::clip(const int x) {
     return (x < 0) ? 0 : ((x > 0xFF) ? 0xFF : (unsigned char) x);
 }
 
+//----------------------------------------------------------------------------//
+std::size_t njDecodeHeader(const void* jpeg, const int size) {
+    std::size_t ret = 0;
+    nj.pos = static_cast<const unsigned char*>(jpeg);
+    nj.size = size & 0x7FFFFFFF;
+    if (nj.size < 2
+            || ((nj.pos[0] ^ 0xFF) | (nj.pos[1] ^ 0xD8))) {
+        throw NotJpegException();
+    }
+    nj.skip(2);
+    while (!nj.finished) {
+        if ((nj.size < 2) || (nj.pos[0] != 0xFF))  {
+            throw SyntaxErrorException();
+        }
+        nj.skip(2);
+        switch (nj.pos[-1]) {
+            case 0xC0: njDecodeSOF(); break;
+            case 0xC4: njDecodeDHT(); return size - nj.size; break;
+            case 0xDB: njDecodeDQT(); break;
+            case 0xDD: nj.decodeDRI(); break;
+            case 0xDA: assert(false); break;
+            case 0xFE: nj.skipMarker(); break;
+            default:
+                if ((nj.pos[-1] & 0xF0) == 0xE0) {
+                    nj.skipMarker();
+                } else {
+                    throw UnsupportedException();
+                }
+        }
+    }
+    assert(false);
+    return 0;
+}

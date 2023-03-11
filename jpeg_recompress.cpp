@@ -55,7 +55,13 @@ int main(int argc, char* argv[]) {
 
         Channels channels; 
 
-        njDecode(channels, buff.data(), buff.size());
+        const auto headerSize = njDecode(channels, buff.data(), buff.size());
+
+        //std::cout << "Header size: " << headerSize << std::endl;
+
+        //auto headerCopy = std::vector<char>();
+        //std::copy(buff.begin(), buff.begin() + headerSize,
+        //          std::back_inserter(headerCopy));
 
         assert(channels[1].size() * 4 == channels[0].size()
                && "Not 4-2-0.");
@@ -121,6 +127,11 @@ int main(int argc, char* argv[]) {
              */
             auto processed = DCACTransform::process(channels[i]);
 
+            std::ofstream chStream("encoded_coeffs_" + std::to_string(i) , std::ios::trunc);
+            for (auto coeff : channels[i]) {
+                chStream << coeff << std::endl;
+            }
+
             outData.putTToPosition<std::int32_t>(processed.dcOffset,
                                                  dcOffsetPos[i]);
             outData.putTToPosition<std::uint32_t>(processed.dcRng, dcRngPos[i]);
@@ -181,8 +192,8 @@ int main(int argc, char* argv[]) {
             logStream << "DC bits length: " << dcBitsCount << std::endl;
         }
 
+        //outCompressed.write(headerCopy.data(), headerCopy.size());
         outCompressed.write(outData.data<const char>(), outData.size());
-
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;
         return 1;

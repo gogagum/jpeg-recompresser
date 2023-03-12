@@ -37,6 +37,12 @@ if(Boost_FOUND)
                    lib/transform/dc_ac_transform.cpp)
     target_link_libraries(jpeg-recompress archievers-applib arithmetic-encoding-lib)
 
+    add_executable(jpeg-recompress-switching jpeg_recompress_switching.cpp
+                   lib/nj/nanojpeg.cpp
+                   lib/file_io.cpp
+                   lib/transform/dc_ac_transform.cpp)
+    target_link_libraries(jpeg-recompress-switching archievers-applib arithmetic-encoding-lib)
+
     add_executable(jpeg-recompress-2 jpeg_recompress_2.cpp
                    lib/nj/nanojpeg.cpp
                    lib/file_io.cpp
@@ -49,6 +55,13 @@ if(Boost_FOUND)
                    lib/jo/jo_write_jpeg.cpp
                    lib/transform/dc_ac_transform.cpp)
     target_link_libraries(jpeg-recompress-back archievers-applib arithmetic-encoding-lib)
+
+    add_executable(jpeg-recompress-back-switching jpeg_recompress_back_switching.cpp
+                   lib/nj/nanojpeg.cpp
+                   lib/file_io.cpp
+                   lib/jo/jo_write_jpeg.cpp
+                   lib/transform/dc_ac_transform.cpp)
+    target_link_libraries(jpeg-recompress-back-switching archievers-applib arithmetic-encoding-lib)
 
     add_executable(jpeg-recompress-back-2 jpeg_recompress_back_2.cpp
                    lib/nj/nanojpeg.cpp

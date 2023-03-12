@@ -41,6 +41,16 @@ int main(int argc, char* argv[]) {
 
         auto inFile = jrec::io::openInputBinFile(inFileName);
         auto buff = jrec::io::readWholeFile(inFile);
+
+        if (*buff.rbegin() == char{0x0f}) {
+            logStream << "Simply copy file." << std::endl;
+            fileOpener.getOutFileStream().write(buff.data(), buff.size() - 1);
+            return 0;
+        } else {
+            assert(*buff.rbegin() == char{0x00});
+            logStream << "Decode transcoded." << std::endl;
+        }
+
         const auto headerSize = njDecodeHeader(buff.data(), buff.size());
 
         logStream << "Header size: " << headerSize << std::endl;

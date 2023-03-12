@@ -185,8 +185,14 @@ int main(int argc, char* argv[]) {
             logStream << "DC bits length: " << dcBitsCount         << std::endl;
         }
 
-        outCompressed.write(headerCopy.data(), headerCopy.size());
-        outCompressed.write(outData.data<const char>(), outData.size());
+        if (headerCopy.size() + outData.size() > buff.size()) {
+            outCompressed.write(buff.data(), buff.size());
+            outCompressed.put(0x0f);
+        } else {
+            outCompressed.write(headerCopy.data(), headerCopy.size());
+            outCompressed.write(outData.data<const char>(), outData.size());
+            outCompressed.put(0x00);
+        }
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;
         return 1;

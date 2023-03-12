@@ -51,6 +51,54 @@
                     "ignoreFailures": true
                 }
             ],
+        },
+        {
+            "name": "(gdb) Launch recompress switching",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/build/jpeg-recompress-switching",
+            "args": ["jpeg80/sails80.jpg", "sails80-test-s", "80"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "(gdb) Launch recompress back switching",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/build/jpeg-recompress-back-switching",
+            "args": ["girl80-test-s", "girl80-test-s-back.jpg"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
         }
     ]
 }

@@ -454,21 +454,20 @@ std::size_t njDecode(ContainerT& out, const void* jpeg, const int size) {
         nj.skip(2);
         switch (nj.pos[-1]) {
             case 0xC0: njDecodeSOF(); break;
-            case 0xC4: njDecodeDHT(); ret = size - nj.size; break;
+            case 0xC4: njDecodeDHT(); ret = size - nj.size + 14; break;
             case 0xDB: njDecodeDQT(); break;
             case 0xDD: nj.decodeDRI(); break;
             case 0xDA: {
                 njDecodeScan(out);
             }
             break;
-            case 0xFE: nj.skipMarker(); std::cout << "LOG offset: " << size - nj.size << std::endl; break;
+            case 0xFE: nj.skipMarker(); break;
             default:
                 if ((nj.pos[-1] & 0xF0) == 0xE0) {
                     nj.skipMarker();
                 } else {
                     throw UnsupportedException();
                 }
-                std::cout << "LOG offset: " << size - nj.size << std::endl; break;
         }
     }
     if (!nj.finished) {

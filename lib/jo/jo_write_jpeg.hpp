@@ -45,24 +45,20 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
     }
 
     // Quantize/descale/zigzag the coefficients
-    int DU[64];
+    std::array<int, 64> DU;
     for (int y = 0, j = 0; y < 8; ++y) {
         for (int x = 0; x < 8; ++x, ++j) {
-            int n = *inDCT;
+            DU[tbl::s_jo_ZigZag[j]] = *inDCT;
             ++inDCT;
-
-            DU[tbl::s_jo_ZigZag[j]] = n;
         }
     }
-    int n;
 
     const auto writeJpegBits = [&outJpeg, &bitBuf, &bitCnt](auto bits) {
         jo_writeBits(outJpeg, bitBuf, bitCnt, bits);
     };
 
     // Encode DC
-    int diff = DU[0] - DC;
-    if (diff == 0) {
+    if (const int diff = DU[0] - DC; diff == 0) {
         writeJpegBits(HTDC[0]);
     } else {
         unsigned short bits[2];
@@ -111,24 +107,15 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
         return false;
     }
 
-    const auto writeArr =
-        [&outJpeg](const auto& arr, std::size_t startOffset = 0) {
-            outJpeg.write(reinterpret_cast<const char*>(arr.data() + startOffset),
-                            arr.size() - startOffset);
-        };
-
-    outJpeg.put(0xFF);
-    writeArr(tbl::head2);
-
     const auto [actualQuality, subsample] = estimQuality(quality);
 
     std::array<unsigned char, 64> YTable;
     std::array<unsigned char, 64> UVTable;
     for (int i = 0; i < 64; ++i) {
         const auto iZZ = tbl::s_jo_ZigZag[i];
-        int yti = (tbl::YQT[i] * actualQuality + 50) / 100;
+        const int yti = (tbl::YQT[i] * actualQuality + 50) / 100;
         YTable[iZZ] = yti < 1 ? 1 : yti > 255 ? 255 : yti;
-        int uvti = (tbl::UVQT[i] * actualQuality + 50) / 100;
+        const int uvti = (tbl::UVQT[i] * actualQuality + 50) / 100;
         UVTable[iZZ] = uvti < 1 ? 1 : uvti > 255 ? 255 : uvti;
     }
 
@@ -143,7 +130,6 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
     }
 
     // Encode 8x8 macroblocks
-    int ofsG = comp > 1 ? 1 : 0, ofsB = comp > 1 ? 2 : 0;
     int DCY = 0, DCU = 0, DCV = 0;
     int bitBuf = 0, bitCnt = 0;
     const auto processDU = [&](auto&&... tailArgs) {
@@ -156,13 +142,6 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
                 std::array<float, 256> Y;
                 std::array<float, 256> U;
                 std::array<float, 256> V;
-                for (int row = y, pos = 0; row < y + 16; ++row) {
-                    for (int col = x; col < x + 16; ++col, ++pos) {
-                        int prow = row >= height ? height - 1 : row;
-                        int pcol = col >= width ? width - 1 : col;
-                        int p = prow * width*comp + pcol * comp;
-                    }
-                }
                 DCY = processDU(Y.data() + 0,   16, fdtbl_Y.data(), DCY,
                                 tbl::YDC_HT, tbl::YAC_HT);
                 DCY = processDU(Y.data() + 8,   16, fdtbl_Y.data(), DCY,
@@ -196,13 +175,6 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
                 std::array<float, 64> Y;
                 std::array<float, 64> U;
                 std::array<float, 64> V;
-                for (int row = y, pos = 0; row < y + 8; ++row) {
-                    for (int col = x; col < x + 8; ++col, ++pos) {
-                        int prow = row >= height ? height - 1 : row;
-                        int pcol = col >= width ? width - 1 : col;
-                        int p = prow * width*comp + pcol * comp;
-                    }
-                }
                 DCY = processDU(Y.data(), 8, fdtbl_Y.data(), DCY,
                                 tbl::YDC_HT, tbl::YAC_HT);
                 DCU = processDU(U.data(), 8, fdtbl_UV.data(), DCU,

@@ -262,7 +262,7 @@ std::size_t njDecodeHeader(const void* jpeg, const int size) {
         nj.skip(2);
         switch (nj.pos[-1]) {
             case 0xC0: njDecodeSOF(); break;
-            case 0xC4: njDecodeDHT(); return size - nj.size; break;
+            case 0xC4: njDecodeDHT(); return size - nj.size + 14; break;
             case 0xDB: njDecodeDQT(); break;
             case 0xDD: nj.decodeDRI(); break;
             case 0xDA: assert(false); break;

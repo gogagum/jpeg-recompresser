@@ -10,3 +10,7 @@ testing/jpeg-recompress
 testing/jpeg-recompress-back
 testing/jpeg30/
 testing/jpeg80/
+testing/encoded30switching/
+testing/encoded80switching/
+testing/jpeg-recompress-back-switching
+testing/jpeg-recompress-switching

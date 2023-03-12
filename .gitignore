@@ -1,3 +1,12 @@
 build*
 CMakeLists.txt.user
 
+testing/.ipynb_checkpoints/
+testing/decoded30/
+testing/decoded80/
+testing/encoded30/
+testing/encoded80/
+testing/jpeg-recompress
+testing/jpeg-recompress-back
+testing/jpeg30/
+testing/jpeg80/

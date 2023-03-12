@@ -3,7 +3,7 @@
 #include "jo_write_jpeg.hpp"
 
 void jo_writeBits(std::ofstream& outFile, int &bitBuf, int &bitCnt,
-                  const unsigned short *bs) {
+                  const std::array<unsigned short, 2>& bs) {
     bitCnt += bs[1];
     bitBuf |= bs[0] << (24 - bitCnt);
     while (bitCnt >= 8) {
@@ -66,7 +66,7 @@ void jo_DCT(float &d0, float &d1, float &d2, float &d3,
     d7 = z11 - z4;
 }
 
-void jo_calcBits(int val, unsigned short bits[2]) {
+void jo_calcBits(int val, std::array<unsigned short, 2>& bits) {
     int tmp1 = val < 0 ? -val : val;
     val = val < 0 ? val - 1 : val;
     bits[1] = 1;

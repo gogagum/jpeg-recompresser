@@ -8,7 +8,7 @@
 #include "tables.hpp"
 
 void jo_writeBits(std::ofstream& outFile, int &bitBuf, int &bitCnt,
-                         const unsigned short *bs);
+                  const std::array<unsigned short, 2>& bs);
 
 struct QualityEstimation {
     int quality;
@@ -20,16 +20,16 @@ QualityEstimation estimQuality(int quality);
 void jo_DCT(float &d0, float &d1, float &d2, float &d3, float &d4,
             float &d5, float &d6, float &d7);
 
-void jo_calcBits(int val, unsigned short bits[2]);
+void jo_calcBits(int val, std::array<unsigned short, 2>& bits);
 
 template <std::input_iterator IteratorT>
 int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
                  int &bitBuf, int &bitCnt, float *CDU, int du_stride,
                  float *fdtbl, int DC,
-                 const unsigned short HTDC[256][2],
-                 const unsigned short HTAC[256][2]) {
-    const unsigned short EOB[2] = { HTAC[0x00][0], HTAC[0x00][1] };
-    const unsigned short M16zeroes[2] = { HTAC[0xF0][0], HTAC[0xF0][1] };
+                 const std::array<unsigned short, 2> HTDC[256],
+                 const std::array<unsigned short, 2> HTAC[256]) {
+    const std::array<unsigned short, 2> EOB{ HTAC[0x00][0], HTAC[0x00][1] };
+    const std::array<unsigned short, 2> M16zeroes{ HTAC[0xF0][0], HTAC[0xF0][1] };
 
     // DCT rows
     for (int i = 0; i < du_stride * 8; i += du_stride) {
@@ -61,7 +61,7 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
     if (const int diff = DU[0] - DC; diff == 0) {
         writeJpegBits(HTDC[0]);
     } else {
-        unsigned short bits[2];
+        std::array<unsigned short, 2> bits;
         jo_calcBits(diff, bits);
         writeJpegBits(HTDC[bits[1]]);
         writeJpegBits(bits);
@@ -84,7 +84,7 @@ int jo_processDU(IteratorT& inDCT, std::ofstream& outJpeg,
             }
             nrzeroes &= 0xF;
         }
-        unsigned short bits[2];
+        std::array<unsigned short, 2> bits;
         jo_calcBits(DU[i], bits);
         writeJpegBits(HTAC[(nrzeroes << 4) + bits[1]]);
         writeJpegBits(bits);
@@ -186,7 +186,7 @@ bool jo_write_jpg(IteratorT& inDCT, std::ofstream& outJpeg,
     }
 
     // Do the bit alignment of the EOI marker
-    static const unsigned short fillBits[] = { 0x7F, 7 };
+    constexpr static const std::array<unsigned short, 2> fillBits = { 0x7F, 7 };
     jo_writeBits(outJpeg, bitBuf, bitCnt, fillBits);
     outJpeg.put(0xFF);
     outJpeg.put(0xD9);

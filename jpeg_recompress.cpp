@@ -125,11 +125,6 @@ int main(int argc, char* argv[]) {
              */
             auto processed = DCACTransform::process(channels[i]);
 
-            std::ofstream chStream("encoded_coeffs_" + std::to_string(i) , std::ios::trunc);
-            for (auto coeff : channels[i]) {
-                chStream << coeff << std::endl;
-            }
-
             outData.putTToPosition<std::int32_t>(processed.dcOffset,
                                                  dcOffsetPos[i]);
             outData.putTToPosition<std::uint32_t>(processed.dcRng, dcRngPos[i]);

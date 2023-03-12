@@ -8,7 +8,7 @@
             "name": "(gdb) Launch recompress",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/build/jpeg-recompress",
+            "program": "${workspaceRoot}/build/jrec",
             "args": ["jpeg30/girl30.jpg", "girl30-test", "30"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
@@ -32,7 +32,7 @@
             "name": "(gdb) Launch recompress back",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/build/jpeg-recompress-back",
+            "program": "${workspaceRoot}/build/jrec-back",
             "args": ["girl30-test", "girl30-test-back.jpg"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
@@ -56,8 +56,8 @@
             "name": "(gdb) Launch recompress switching",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/build/jpeg-recompress-switching",
-            "args": ["jpeg80/sails80.jpg", "sails80-test-s", "80"],
+            "program": "${workspaceRoot}/build/jrec-swch",
+            "args": ["jpeg30/sails30.jpg", "sails30-test-s", "30"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],
@@ -80,8 +80,56 @@
             "name": "(gdb) Launch recompress back switching",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/build/jpeg-recompress-back-switching",
-            "args": ["girl80-test-s", "girl80-test-s-back.jpg"],
+            "program": "${workspaceRoot}/build/jrec-back-swch",
+            "args": ["sails30-test-s", "sails30-test-s-back.jpg"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+        },
+        {
+            "name": "(gdb) Launch recompress switching, header encode",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/build/jrec-swch-he",
+            "args": ["jpeg30/sails30.jpg", "sails30-test-s-he", "30"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "(gdb) Launch recompress back switching, header encode",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/build/jrec-back-swch-he",
+            "args": ["sails30-test-s-he", "sails30-test-s-he-back.jpg"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],

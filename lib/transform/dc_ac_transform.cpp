@@ -115,7 +115,7 @@ std::vector<std::int32_t> DCACTransform::_joinACDC(
 std::vector<std::int32_t> DCACTransform::_rangeMoveBack(
         const std::vector<std::uint32_t>& numbersMoved,
         std::int32_t offset) {
-    std::vector<std::int32_t> ret;        
+    std::vector<std::int32_t> ret;
     std::transform(numbersMoved.begin(), numbersMoved.end(),
                    std::back_inserter(ret),
                    [offset](std::uint32_t num) -> std::int32_t {

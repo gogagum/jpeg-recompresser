@@ -19,11 +19,7 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 
 if(Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
-    #add_executable(draft-enc draft/lib/jpegenc.cpp
-    #               draft/lib/enc/jo_write_jpeg.cpp
-    #               draft/lib/enc/jo_write_jpeg.hpp)
-    #add_executable(draft-dec draft/lib/jpegdec.cpp draft/lib/dec/nanojpeg.cpp)
-    
+
     add_subdirectory(archiever/thirdparty/dynamic-segment-tree)
     include_directories(archiever/thirdparty/dynamic-segment-tree/include)
     add_subdirectory(archiever/encoding_lib)
@@ -31,44 +27,32 @@ if(Boost_FOUND)
     add_subdirectory(archiever/applib)
     include_directories(archiever/applib/include)
 
-    add_executable(jpeg-recompress jpeg_recompress.cpp
-                   lib/nj/nanojpeg.cpp
-                   lib/file_io.cpp
-                   lib/transform/dc_ac_transform.cpp)
-    target_link_libraries(jpeg-recompress archievers-applib arithmetic-encoding-lib)
+    set(REC_CPPS
+            lib/nj/nanojpeg.cpp lib/file_io.cpp
+            lib/transform/dc_ac_transform.cpp)
 
-    add_executable(jpeg-recompress-switching jpeg_recompress_switching.cpp
-                   lib/nj/nanojpeg.cpp
-                   lib/file_io.cpp
-                   lib/transform/dc_ac_transform.cpp)
-    target_link_libraries(jpeg-recompress-switching archievers-applib arithmetic-encoding-lib)
+    add_executable(jrec jrec.cpp ${REC_CPPS})
+    target_link_libraries(jrec archievers-applib arithmetic-encoding-lib)
 
-    add_executable(jpeg-recompress-2 jpeg_recompress_2.cpp
-                   lib/nj/nanojpeg.cpp
-                   lib/file_io.cpp
-                   lib/transform/dc_ac_transform2.cpp)
-    target_link_libraries(jpeg-recompress-2 archievers-applib arithmetic-encoding-lib)
+    add_executable(jrec-swch jrec_swch.cpp ${REC_CPPS})
+    target_link_libraries(jrec-swch archievers-applib arithmetic-encoding-lib)
 
-    add_executable(jpeg-recompress-back jpeg_recompress_back.cpp
-                   lib/nj/nanojpeg.cpp
-                   lib/file_io.cpp
-                   lib/jo/jo_write_jpeg.cpp
-                   lib/transform/dc_ac_transform.cpp)
-    target_link_libraries(jpeg-recompress-back archievers-applib arithmetic-encoding-lib)
+    add_executable(jrec-swch-he jrec_swch_he.cpp ${REC_CPPS})
+    target_link_libraries(jrec-swch-he archievers-applib arithmetic-encoding-lib)
 
-    add_executable(jpeg-recompress-back-switching jpeg_recompress_back_switching.cpp
-                   lib/nj/nanojpeg.cpp
-                   lib/file_io.cpp
-                   lib/jo/jo_write_jpeg.cpp
-                   lib/transform/dc_ac_transform.cpp)
-    target_link_libraries(jpeg-recompress-back-switching archievers-applib arithmetic-encoding-lib)
+    set(REC_CPPS_BACK 
+            lib/nj/nanojpeg.cpp lib/file_io.cpp
+            lib/jo/jo_write_jpeg.cpp lib/transform/dc_ac_transform.cpp)
 
-    add_executable(jpeg-recompress-back-2 jpeg_recompress_back_2.cpp
-                   lib/nj/nanojpeg.cpp
-                   lib/file_io.cpp
-                   lib/jo/jo_write_jpeg.cpp
-                   lib/transform/dc_ac_transform.cpp)
-    target_link_libraries(jpeg-recompress-back-2 archievers-applib arithmetic-encoding-lib)
+    add_executable(jrec-back jrec_back.cpp ${REC_CPPS_BACK})
+    target_link_libraries(jrec-back archievers-applib arithmetic-encoding-lib)
+
+    add_executable(jrec-back-swch jrec_back_swch.cpp ${REC_CPPS_BACK})
+    target_link_libraries(jrec-back-swch archievers-applib arithmetic-encoding-lib)
+
+    add_executable(jrec-back-swch-he jrec_back_swch_he.cpp ${REC_CPPS_BACK})
+    target_link_libraries(jrec-back-swch-he archievers-applib arithmetic-encoding-lib)
+
 endif()
 
 

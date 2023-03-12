@@ -15,7 +15,9 @@
 
 #include "applib/file_opener.hpp"
 #include "applib/opt_ostream.hpp"
+#include "lib/file_io.hpp"
 #include "lib/jo/jo_write_jpeg.hpp"
+#include "lib/nj/nanojpeg.hpp"
 #include "lib/transform/dc_ac_transform.hpp"
 
 namespace bc = boost::container;
@@ -25,7 +27,7 @@ namespace bc = boost::container;
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         std::cout << "Usage: " << std::string(argv[0])
-                  << " <input-jpeg> <out-binary-file>" << std::endl;
+                  << " <input-binary-file> <uncompressed-jpeg>" << std::endl;
         return 0;
     }
 
@@ -36,13 +38,27 @@ int main(int argc, char* argv[]) {
         auto logStream = optout::OptOstreamRef{std::cout};
 
         auto fileOpener = FileOpener(inFileName, outFileName);
+
+        if (*fileOpener.getInData().rbegin() == std::byte{0x0f}) {
+            logStream << "Simply copy file." << std::endl;
+            fileOpener.getOutFileStream().write(
+                reinterpret_cast<const char*>(fileOpener.getInData().data()),
+                fileOpener.getInData().size() - 1);
+            return 0;
+        } else {
+            assert(*fileOpener.getInData().rbegin() == std::byte{0x00});
+            logStream << "Decode transcoded." << std::endl;
+        }
+
         auto inData = ael::DataParser(fileOpener.getInData());
 
         auto imageQuality = inData.takeT<std::uint32_t>();
         auto width = inData.takeT<std::uint32_t>();
         auto height = inData.takeT<std::uint32_t>();
         auto nComp = inData.takeT<std::uint8_t>();
-        
+        auto headerSize = inData.takeT<std::uint16_t>();
+        auto headerEncodedBitsCnt = inData.takeT<std::uint16_t>();
+
         bc::static_vector<std::int32_t, 3> dcOffset(nComp);
         bc::static_vector<std::uint32_t, 3> dcRng(nComp);
         bc::static_vector<std::int32_t, 3> acOffset(nComp);
@@ -76,6 +92,14 @@ int main(int argc, char* argv[]) {
             acBitsCount[i] = inData.takeT<std::uint32_t>();
             acLengthesBitsCount[i] = inData.takeT<std::uint32_t>();
         }
+
+        logStream << "Header size: " << headerSize << std::endl;
+
+        auto headerDict = ael::dict::PPMDDictionary(256, 3);
+        std::vector<std::uint8_t> headerOrds;
+        ael::ArithmeticDecoder::decode(inData, headerDict, std::back_inserter(headerOrds), headerSize, headerEncodedBitsCnt);
+
+        assert(headerOrds.size() == headerSize);
 
         bc::static_vector<std::vector<std::int32_t>, 8> channels(nComp);
 
@@ -127,6 +151,8 @@ int main(int argc, char* argv[]) {
         }
 
         auto iter = channelsJoined.begin();
+
+        fileOpener.getOutFileStream().write(reinterpret_cast<char*>(headerOrds.data()), headerOrds.size());
 
         jo_write_jpg(iter, fileOpener.getOutFileStream(), width, height,
                      nComp, imageQuality);

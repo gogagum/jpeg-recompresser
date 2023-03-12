@@ -24,7 +24,7 @@
 #include <boost/range/adaptor/transformed.hpp>
 
 #include "lib/file_io.hpp"
-#include "lib/transform/dc_ac_transform2.hpp"
+#include "lib/transform/dc_ac_transform.hpp"
 #include "lib/nj/nanojpeg.hpp"
 
 namespace bc = boost::container;
@@ -55,19 +55,23 @@ int main(int argc, char* argv[]) {
 
         Channels channels; 
 
-        njDecode(channels, buff.data(), buff.size());
+        const auto headerSize = njDecode(channels, buff.data(), buff.size());
+
+        logStream << "Header size: " << headerSize << std::endl;
+
+        auto headerCopy = std::vector<char>();
+        std::copy(buff.begin(), buff.begin() + headerSize,
+                  std::back_inserter(headerCopy));
 
         assert(channels[1].size() * 4 == channels[0].size()
                && "Not 4-2-0.");
         assert(channels[2].size() * 4 == channels[0].size()
                && "Not 4-2-0.");
 
-        std::cout << "Channels count: " << channels.size() << std::endl;
+        logStream << "Channels count: " << channels.size() << std::endl;
         for (auto& channel: channels) {
-            std::cout << "Channel size: " << channel.size() << std::endl; 
+            logStream << "Channel size: " << channel.size() << std::endl; 
         }
-
-        std::cout << nj.ncomp << std::endl;
 
         auto width = std::uint32_t(nj.getWidth());
         auto height = std::uint32_t(nj.getHeight());
@@ -77,6 +81,8 @@ int main(int argc, char* argv[]) {
         outData.putT(width);
         outData.putT(height);
         outData.putT(nComp);
+        outData.putT<std::uint16_t>(headerSize);
+        const auto headerBitsCntPos = outData.saveSpaceForT<std::uint16_t>();
 
         if (nj.ncomp > 3) {
             throw std::invalid_argument("Unsupported channels count.");
@@ -108,6 +114,16 @@ int main(int argc, char* argv[]) {
             acLengthesBitsCountPos[i] = outData.saveSpaceForT<std::uint32_t>();
         }
 
+        auto headerBytesOrds = std::span<const std::uint8_t>(
+            reinterpret_cast<std::uint8_t*>(headerCopy.data()),
+            headerCopy.size());
+
+        auto headerDict = ael::dict::PPMDDictionary(256, 3);
+        auto [headerBytesEncoded, headerBitsEncoded] =
+            ael::ArithmeticCoder::encode(headerBytesOrds, outData, headerDict, logStream);
+        assert(headerBytesEncoded == headerCopy.size());
+        outData.putTToPosition<std::uint16_t>(headerBitsEncoded, headerBitsCntPos);
+
         for (std::size_t i = 0; i < nj.ncomp; ++i) {
             /**
              * dcMoved
@@ -119,7 +135,7 @@ int main(int argc, char* argv[]) {
              * acLengthes
              * acLengthesRng
              */
-            auto processed = DCACTransform2::process(channels[i]);
+            auto processed = DCACTransform::process(channels[i]);
 
             outData.putTToPosition<std::int32_t>(processed.dcOffset,
                                                  dcOffsetPos[i]);
@@ -127,7 +143,11 @@ int main(int argc, char* argv[]) {
             outData.putTToPosition<std::int32_t>(processed.acOffset,
                                                  acOffsetPos[i]);
             outData.putTToPosition<std::uint32_t>(processed.acRng, acRngPos[i]);
-            
+            outData.putTToPosition<std::uint8_t>(processed.acLengthesRng,
+                                                 acLengthRngPos[i]);
+
+            assert(processed.acLengthes.size() == processed.dc.size()
+                   && "AC lengthes count is not equal with DCs count.");
             outData.putTToPosition<std::uint32_t>(processed.dc.size(),
                                                   blocksCountPos[i]);
             outData.putTToPosition<std::uint32_t>(processed.acProcessed.size(),
@@ -170,15 +190,20 @@ int main(int argc, char* argv[]) {
             outData.putTToPosition<std::uint32_t>(acLengthesBitsCount,
                                                   acLengthesBitsCountPos[i]);
 
-            logStream << "AC range: " << processed.acRng << std::endl;
-            logStream << "DC range: " << processed.dcRng << std::endl;
-            logStream << "AC bits: " << acBitsCount << std::endl;
-            logStream << "AC lengthes bits: " << acLengthesBitsCount << std::endl;
-            logStream << "DC bits length: " << dcBitsCount << std::endl;
+            logStream << "AC range: "       << processed.acRng     << std::endl;
+            logStream << "DC range: "       << processed.dcRng     << std::endl;
+            logStream << "AC bits: "        << acBitsCount         << std::endl;
+            logStream << "AC len bits: "    << acLengthesBitsCount << std::endl;
+            logStream << "DC bits length: " << dcBitsCount         << std::endl;
         }
 
-        outCompressed.write(outData.data<const char>(), outData.size());
-
+        if (outData.size() > buff.size()) {
+            outCompressed.write(buff.data(), buff.size());
+            outCompressed.put(0x0f);
+        } else {
+            outCompressed.write(outData.data<const char>(), outData.size());
+            outCompressed.put(0x00);
+        }
     } catch (std::runtime_error& err) {
         std::cout << err.what() << std::endl;
         return 1;
